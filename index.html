@@ -36,7 +36,12 @@ textarea{width:100%;resize:vertical;min-height:38px}
 .chip.on{background:var(--ink);color:var(--bg);border-color:var(--ink)}
 .chip b{font-weight:600;opacity:.7;margin-left:3px}
 .card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:12px 12px 10px;margin-bottom:10px;border-left:4px solid var(--line)}
-.card.late{border-left-color:var(--accent)}
+.card.late{border-left-color:var(--accent);background:var(--accent);color:#fff}
+.card.late .title,.card.late .cname,.card.late .info,.card.late .when,.card.late .when b,.card.late .muted,.card.late summary,.card.late .mine label{color:#fff!important}
+.card.late a{color:#fff}.card.late .code{background:#fff;color:var(--accent)}.card.late .type{color:#fff;border-color:#fff}
+.card.late .btn.ghost{color:#fff}.card.late .seg{border-color:rgba(255,255,255,.6);background:var(--card)}
+.card.urgent{border-left-color:var(--accent)}
+.urgent .when b{color:var(--accent)}
 .card.soon{border-left-color:var(--warn)}
 .card.done{opacity:.62}
 .row1{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:4px}
@@ -104,7 +109,9 @@ table.tight tr:last-child td{border-bottom:0}
 table.tight tbody tr{cursor:pointer}
 table.tight td.ttl{white-space:normal;width:100%;line-height:1.25}
 table.tight td.num{text-align:right;font-variant-numeric:tabular-nums;font-weight:600}
-table.tight tr.late td.num,table.tight tr.late td:first-child{color:var(--accent)}
+table.tight tr.late td{background:var(--accent);color:#fff;font-weight:600}
+table.tight tr.late .code{background:#fff;color:var(--accent)}table.tight tr.late .tentti{color:#fff}
+table.tight tr.urgent td.num,table.tight tr.urgent td:first-child{color:var(--accent)}
 table.tight tr.soon td.num,table.tight tr.soon td:first-child{color:var(--warn)}
 table.tight .code{font-size:11px;padding:1px 5px}
 table.tight .tentti{color:var(--accent);font-weight:600;font-size:12px}
@@ -161,6 +168,7 @@ function daysLeft(dl){ if(!dl) return null; const [y,m,d]=dl.split("-").map(Numb
 function fmtDate(dl){ if(!dl) return "ei DL:ää"; const [y,m,d]=dl.split("-"); const wd=["su","ma","ti","ke","to","pe","la"][new Date(+y,+m-1,+d).getDay()]; return `${wd} ${+d}.${+m}.${y!==String(new Date().getFullYear())?y:""}`; }
 const courseName = code => (S.courses.find(c=>c.code===code)||{}).name || "";
 const effDl = (t,m) => (m && m.my_dl) || t.dl || "";
+const urg = d => d<0 ? "late" : d<3 ? "urgent" : d<7 ? "soon" : "";
 const isPast = t => { const d=daysLeft(t.dl); return d!==null && d<0; };
 const linkFor = tok => BASE + "#k=" + tok;
 
@@ -223,7 +231,7 @@ function card(task, mine, mode){
   const st = mine ? normStatus(mine.status, task) : null;
   const finished = mine ? isFinished(st, task) : false;
   let cls = "";
-  if(!finished && d!==null){ if(d<0) cls="late"; else if(d<=3) cls="soon"; }
+  if(!finished && d!==null) cls=urg(d);
   if(finished || (mode==="kaikki" && isPast(task))) cls+=" done";
   const whenTxt = d===null ? "" : d<0 ? `${-d} vrk sitten` : d===0 ? "tänään" : d===1 ? "huomenna" : `${d} vrk`;
   const url = safeUrl(task.moodle);
@@ -280,7 +288,7 @@ function renderHome(){
   let h=`<div class="hhead"><b>Tulossa</b><span class="muted">${rows.length} aktiivista</span></div>`;
   if(!rows.length) h+=`<div class="empty"><p>Ei aktiivisia tehtäviä korissasi.</p><button class="btn" data-act="go" data-view="kaikki">Selaa tehtäviä</button></div>`;
   else h+=`<table class="tight"><thead><tr><th>DL</th><th>vrk</th><th>Kurssi</th><th>Aihe</th><th>Tila</th></tr></thead><tbody>${rows.map(r=>{
-    const d=daysLeft(r.dl), cls=d===null?"":d<0?"late":d<=3?"soon":"";
+    const d=daysLeft(r.dl), cls=d===null?"":urg(d);
     const dd=r.dl?r.dl.split("-"):null;
     return `<tr class="${cls}" data-act="jump" data-id="${esc(r.t.id)}"><td>${dd?`${+dd[2]}.${+dd[1]}.`:"–"}</td><td class="num">${d===null?"":d}</td>
       <td><span class="code">${esc(r.t.course)}</span></td>
