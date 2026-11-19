@@ -193,7 +193,7 @@ function readStore(k){ try{ return localStorage.getItem(k); }catch(_){ return nu
 async function rpc(fn, args={}){
   const r = await fetch(`${APP_CONFIG.SUPABASE_URL}/rest/v1/rpc/${fn}`, { method:"POST",
     headers:{ "apikey":APP_CONFIG.SUPABASE_KEY, "Content-Type":"application/json" },
-    body: JSON.stringify({ p_token:S.token, ...args }) });
+    body: JSON.stringify(fn==="app_login" ? args : { p_token:S.token, ...args }) });
   const txt = await r.text(); let data=null; try{ data = txt ? JSON.parse(txt) : null; }catch(_){ data=txt; }
   if(!r.ok){ const e=new Error((data&&data.message)||"Virhe"); e.code=data&&data.code; throw e; }
   return data;
@@ -226,13 +226,17 @@ function render(){
   $("#navAdmin").classList.toggle("hidden", !(ok && S.me.is_admin));
   $("#fab").classList.toggle("hidden", !ok || S.view==="admin");
   document.querySelectorAll("nav button").forEach(b=>b.classList.toggle("on", b.dataset.view===S.view));
-  if(!S.token){ $("#main").innerHTML = `<div class="login"><h2>${S.invalid?"Linkki ei ole enää voimassa":"Avaa henkilökohtainen linkkisi"}</h2>
-    <p>${S.invalid?"Pyydä ylläpitäjältä uusi linkki.":"Sovellusta käytetään ylläpitäjältä saadulla henkilökohtaisella linkillä. Avaa linkki tällä laitteella, niin sovellus muistaa sinut."}</p></div>
+  if(!S.token){ $("#main").innerHTML = `<div class="login"><h2>Kirjaudu</h2>
+    <p>${S.invalid?"Kirjautumisesi on vanhentunut. Kirjaudu uudelleen.":"Kirjaudu ylläpitäjältä saamallasi käyttäjätunnuksella ja salasanalla. Sovellus muistaa sinut tällä laitteella."}</p>
+    <form id="loginForm"><input name="u" required autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="Käyttäjätunnus (etunimi)">
+    <input name="pw" type="password" required autocomplete="current-password" placeholder="Salasana">
+    <button class="btn primary" type="submit">Kirjaudu</button></form><p id="loginMsg" class="err" style="margin:10px 0 0"></p>
+    <p class="muted" style="margin:12px 0 0">Jos sait henkilökohtaisen linkin, voit myös vain avata sen.</p></div>
     <div class="foot"><button data-act="privacy">Mitä tietoja tallennetaan</button></div>`; return; }
   if(!S.loaded){ $("#main").innerHTML = `<div class="empty">Ladataan…</div>`; return; }
   const v = S.view==="etusivu" ? renderHome() : S.view==="kori" ? renderKori() : S.view==="kaikki" ? renderKaikki() : renderAdmin();
   $("#main").innerHTML = v + `<div class="foot">Kirjautuneena: ${esc(S.me.first_name)}<br>
-    <button data-act="profile">Oma nimi</button>·<button data-act="privacy">Mitä tietoja tallennetaan</button>·<button data-act="logout">Unohda tämä laite</button></div>`;
+    <button data-act="profile">Oma tili</button>·<button data-act="privacy">Mitä tietoja tallennetaan</button>·<button data-act="logout">Kirjaudu ulos</button></div>`;
 }
 function card(task, mine, mode){
   const dl = effDl(task, mine), d = daysLeft(dl);
@@ -328,20 +332,29 @@ function renderKaikki(){
   if(past.length) h += `<div class="group">Menneet</div>`+past.map(t=>card(t,S.mine.get(t.id),"kaikki")).join("");
   return h;
 }
-function linkBox(name, tok){
-  const l=linkFor(tok);
-  return `<div class="notice warn"><b>Linkki: ${esc(name)}</b><br><span class="muted">Kopioi ja lähetä nyt – linkkiä ei näytetä uudelleen. Tarvittaessa voit luoda uuden.</span>
-    <input readonly value="${esc(l)}" style="width:100%;margin-top:8px" onclick="this.select()">
-    <button class="btn primary" data-act="copy" data-link="${esc(l)}">Kopioi linkki</button> <button class="btn ghost" data-act="hideLink">Valmis</button></div>`;
+function linkBox(c){
+  const lines=[`Opintotehtävät N26: ${BASE}`];
+  if(c.username) lines.push(`Käyttäjätunnus: ${c.username}`);
+  if(c.password) lines.push(`Salasana: ${c.password}`);
+  if(c.tok) lines.push(`Tai suora kirjautumislinkki: ${linkFor(c.tok)}`);
+  const txt=lines.join("\n");
+  return `<div class="notice warn"><b>${esc(c.name)}: ${c.password&&c.tok?"tunnukset ja linkki":c.password?"uusi salasana":"uusi linkki"}</b><br>
+    <span class="muted">Kopioi ja lähetä nyt suoraan henkilölle – tietoja ei näytetä uudelleen.</span>
+    <textarea readonly rows="${lines.length+2}" style="margin-top:8px;font-size:13px" onclick="this.select()">${esc(txt)}</textarea>
+    <button class="btn primary" data-act="copy" data-link="${esc(txt)}">Kopioi</button> <button class="btn ghost" data-act="hideLink">Valmis</button></div>`;
 }
 function renderAdmin(){
   const ago = t => !t ? "ei vielä käyttänyt" : "käytti viimeksi " + new Date(t).toLocaleDateString("fi-FI");
-  return (S.newLink?linkBox(S.newLink.name,S.newLink.tok):"") + `<div class="notice"><b>Kurssin jäsenet</b><br>
-    <span class="muted">Jokainen jäsen saa oman linkin. Jos linkki joutuu vääriin käsiin, luo uusi – vanha lakkaa toimimasta heti.</span>
+  return (S.newLink?linkBox(S.newLink):"") + `<div class="notice"><b>Kurssin jäsenet</b><br>
+    <span class="muted">Uusi jäsen saa käyttäjätunnuksen, salasanan ja suoran kirjautumislinkin. Jos tunnus tai linkki joutuu vääriin käsiin, luo uusi – vanha lakkaa toimimasta heti.</span>
     <form id="addMember" class="bar" style="margin-top:10px"><input name="n" required maxlength="30" placeholder="Etunimi" style="flex:1">
-    <button class="btn primary" type="submit">Luo linkki</button></form>
-    <table class="adm">${S.members.map(m=>`<tr><td>${esc(m.first_name)}${m.is_admin?` <span class="type">ylläpitäjä</span>`:""}<br><span class="muted">${ago(m.last_seen)}</span></td>
-      <td style="text-align:right;white-space:nowrap"><button class="btn ghost" data-act="reset" data-mid="${esc(m.id)}" data-name="${esc(m.first_name)}">Uusi linkki</button>
+    <input name="u" required maxlength="30" placeholder="Tunnus" autocapitalize="none" style="flex:1">
+    <button class="btn primary" type="submit">Luo tunnus</button></form>
+    <table class="adm">${S.members.map(m=>`<tr><td>${esc(m.first_name)}${m.is_admin?` <span class="type">ylläpitäjä</span>`:""}<br>
+      <span class="muted">tunnus: <b>${esc(m.username||"–")}</b>${m.has_password?"":" · ei salasanaa"} · ${ago(m.last_seen)}</span></td>
+      <td style="text-align:right"><button class="btn ghost" data-act="resetPw" data-mid="${esc(m.id)}" data-name="${esc(m.first_name)}" data-user="${esc(m.username||"")}">Uusi salasana</button>
+      <button class="btn ghost" data-act="reset" data-mid="${esc(m.id)}" data-name="${esc(m.first_name)}">Uusi linkki</button>
+      <button class="btn ghost" data-act="editUser" data-mid="${esc(m.id)}" data-user="${esc(m.username||"")}">Tunnus</button>
       ${m.id===S.me.id?"":`<button class="btn ghost" data-act="rmMember" data-mid="${esc(m.id)}">Poista</button>`}</td></tr>`).join("")}</table>
     <p class="muted">${S.members.length} jäsentä</p></div>`;
 }
@@ -351,18 +364,31 @@ let editing=null;
 function openSheet(html){ $("#sheet").innerHTML=html; $("#sheetBg").classList.add("open"); }
 function closeSheet(){ $("#sheetBg").classList.remove("open"); editing=null; }
 function openProfile(){
-  openSheet(`<h2>Oma nimi</h2><form class="form" id="profForm">
-    <p class="muted" style="margin:0">Tallennamme sinusta vain etunimen tai nimimerkin. Se näkyy muille tehtävän lisääjänä.</p>
-    <label>Etunimi tai nimimerkki<input name="n" maxlength="30" required value="${esc(S.me.first_name)}"></label>
+  openSheet(`<h2>Oma tili</h2>
+    <p class="muted" style="margin:0 0 10px">Käyttäjätunnus: <b>${esc(S.me.username||"–")}</b>${S.me.has_password?"":" · salasanaa ei ole vielä asetettu"}</p>
+    <form class="form" id="profForm">
+    <label>Etunimi tai nimimerkki (näkyy muille tehtävän lisääjänä)<input name="n" maxlength="30" required value="${esc(S.me.first_name)}"></label>
+    <div class="actions"><button class="btn" type="submit">Tallenna nimi</button></div></form>
+    <form class="form" id="pwForm" style="margin-top:14px">
+    <label>${S.me.has_password?"Uusi salasana":"Aseta salasana"} (vähintään 8 merkkiä)<input name="p1" type="password" minlength="8" required autocomplete="new-password"></label>
+    <label>Salasana uudelleen<input name="p2" type="password" minlength="8" required autocomplete="new-password"></label>
+    <div class="err" id="pwErr"></div>
+    <div class="actions"><button type="button" class="btn" data-act="close">Sulje</button><button class="btn primary" type="submit">Vaihda salasana</button></div></form>`);
+}
+function openUsername(mid,cur){
+  openSheet(`<h2>Käyttäjätunnus</h2><form class="form" id="userForm" data-mid="${esc(mid)}">
+    <label>Tunnus (a–z, numerot, . _ -)<input name="u" maxlength="30" required autocapitalize="none" value="${esc(cur)}"></label>
+    <div class="err" id="uErr"></div>
     <div class="actions"><button type="button" class="btn" data-act="close">Peruuta</button><button class="btn primary" type="submit">Tallenna</button></div></form>`);
 }
 function openPrivacy(){
   openSheet(`<h2>Mitä tietoja tallennetaan</h2><div class="txt"><ul>
     <li><b>Etunimi tai nimimerkki</b> – näkyy muille vain tehtävän lisääjänä. Sukunimiä tai sähköpostiosoitteita ei tallenneta.</li>
+    <li><b>Käyttäjätunnus ja salasana</b> – salasanasta tallennetaan vain tiiviste, jota kukaan ei voi lukea, ei ylläpitäjäkään.</li>
     <li><b>Oma kori</b> (statukset, muistiinpanot, oma DL) ja <b>henkilökohtaiset tehtävät</b> – vain sinä näet nämä.</li>
     <li><b>Yhteiset tehtävät ja kurssit</b> – näkyvät kaikille kurssin jäsenille.</li>
     <li><b>Viimeisin käyttöpäivä</b> – näkyy ylläpitäjälle.</li></ul>
-    <p>Pääsy on vain henkilökohtaisella linkillä. Älä jaa omaa linkkiäsi – sillä pääsee omaan koriisi. Tiedot säilytetään EU:ssa (Supabase). Ylläpitäjä poistaa tietosi pyynnöstä.</p></div>
+    <p>Pääsy vain omalla tunnuksella tai henkilökohtaisella linkillä. Älä jaa salasanaasi tai linkkiäsi – niillä pääsee omaan koriisi. Tiedot säilytetään EU:ssa (Supabase). Ylläpitäjä poistaa tietosi pyynnöstä.</p></div>
     <div class="actions"><button class="btn" data-act="close">Sulje</button></div>`);
 }
 function openForm(id){
@@ -426,7 +452,23 @@ document.addEventListener("submit", async e=>{
   e.preventDefault(); const f=e.target;
   if(f.id==="taskForm") saveTask(f);
   else if(f.id==="profForm"){ const n=f.n.value.trim(); if(!n) return; await act("app_rename",{p_name:n},"Tallennettu"); closeSheet(); loadAll(); }
-  else if(f.id==="addMember"){ const n=f.n.value.trim(); if(!n) return; const tok=await act("app_add_member",{p_name:n,p_admin:false}); S.newLink={name:n,tok}; loadAll(); }
+  else if(f.id==="addMember"){ const n=f.n.value.trim(), u=f.u.value.trim().toLowerCase(); if(!n||!u) return;
+    const r=await act("app_create_member",{p_name:n,p_username:u}); S.newLink={name:n,username:r.username,password:r.password,tok:r.token}; loadAll(); }
+  else if(f.id==="loginForm"){
+    const b=f.querySelector("button"); b.disabled=true; $("#loginMsg").textContent="";
+    try{ const r=await rpc("app_login",{p_username:f.u.value.trim(),p_password:f.pw.value});
+      if(r&&r.ok){ S.token=r.token; store("amkn26_token",r.token); S.invalid=false; S.loaded=false; render(); loadAll(); }
+      else $("#loginMsg").textContent=(r&&r.error)||"Kirjautuminen epäonnistui";
+    }catch(e){ $("#loginMsg").textContent="Ei yhteyttä. Yritä hetken päästä uudelleen."; }
+    b.disabled=false;
+  }
+  else if(f.id==="pwForm"){
+    if(f.p1.value!==f.p2.value) return $("#pwErr").textContent="Salasanat eivät täsmää.";
+    try{ await rpc("app_set_password",{p_new:f.p1.value}); toast("Salasana vaihdettu"); closeSheet(); loadAll(); }catch(e){ $("#pwErr").textContent=e.message||"Vaihto epäonnistui"; }
+  }
+  else if(f.id==="userForm"){
+    try{ await rpc("app_set_username",{p_member:f.dataset.mid,p_username:f.u.value}); toast("Tunnus tallennettu"); closeSheet(); loadAll(); }catch(e){ $("#uErr").textContent=e.message||"Tallennus epäonnistui"; }
+  }
 });
 document.addEventListener("click", async e=>{
   const nb=e.target.closest("nav button"); if(nb){ S.view=nb.dataset.view; render(); scrollTo(0,0); return; }
@@ -441,7 +483,9 @@ document.addEventListener("click", async e=>{
   else if(a==="edit") openForm(id);
   else if(a==="profile") openProfile();
   else if(a==="privacy") openPrivacy();
-  else if(a==="logout"){ if(!confirmTwice("Varmasti? Tarvitset linkin uudelleen")) return; store("amkn26_token",null); S.token=null; S.loaded=false; S.me=null; render(); }
+  else if(a==="logout"){ if(!confirmTwice("Kirjaudutaanko ulos?")) return; try{ await rpc("app_logout"); }catch(_){} store("amkn26_token",null); S.token=null; S.loaded=false; S.me=null; render(); }
+  else if(a==="resetPw"){ if(!confirmTwice("Vanha salasana lakkaa toimimasta – OK?")) return; const pw=await act("app_reset_password",{p_member:b.dataset.mid}); S.newLink={name:b.dataset.name,username:b.dataset.user,password:pw}; loadAll(); }
+  else if(a==="editUser"){ openUsername(b.dataset.mid,b.dataset.user); }
   else if(a==="jump"){ S.view="kori"; S.f.koriStatus="aktiiviset"; render(); const c=document.getElementById("c-"+id); if(c){ c.scrollIntoView({block:"center"}); c.style.outline="2px solid var(--info)"; setTimeout(()=>c.style.outline="",1500); } }
   else if(a==="hide"){ const m=S.mine.get(id)||{task_id:id,status:"Annettu",note:"",my_dl:null}; S.mine.set(id,{...m,hidden:true}); render(); try{ await act("app_set_hidden",{p_task:id,p_hidden:true},"Piilotettu – löydät sen Piilotetut-suodattimesta"); }catch(_){ loadAll(); } }
   else if(a==="unhide"){ try{ await act("app_set_hidden",{p_task:id,p_hidden:false},"Palautettu"); }finally{ loadAll(); } }
@@ -468,6 +512,8 @@ document.addEventListener("change", e=>{
   else if(a==="fCourse"){ S.f.course=el.value; render(); }
 });
 let qT; document.addEventListener("input", e=>{
+  const fm=e.target.form; if(fm && fm.id==="addMember" && e.target.name==="n" && !fm.u.dataset.touched) fm.u.value=e.target.value.trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^a-z0-9._-]/g,"");
+  if(fm && fm.id==="addMember" && e.target.name==="u") fm.u.dataset.touched="1";
   if(e.target.dataset && e.target.dataset.act==="fQ"){ const el=e.target; clearTimeout(qT); qT=setTimeout(()=>{ S.f.q=el.value; const p=el.selectionStart; render(); const n=$('[data-act=fQ]'); if(n){n.focus(); n.setSelectionRange(p,p);} },250); }
 });
 let pending=false;
