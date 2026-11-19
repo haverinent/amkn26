@@ -8,12 +8,11 @@ Kurssin yhteinen oppimistehtävien ja tenttien seuranta. Tehtävät ovat yhteisi
 ## Käyttöönotto
 1. Supabase → **SQL Editor**: aja järjestyksessä
    1. `supabase/01_schema.sql` (taulut ja käyttöoikeudet)
-   2. `supabase/02_seed.sql` (vaihda ensin oma sähköpostisi riville `OMA@SAHKOPOSTI.FI`)
+   2. `supabase/02_seed.sql` (vaihda ensin oma sähköpostisi riville `OMA@SAHKOPOSTI.FI` – vain SQL Editoriin, ei repoon)
 2. Supabase → **Authentication → URL Configuration**
    - Site URL: `https://haverinent.github.io/amkn26/`
    - Redirect URLs: `https://haverinent.github.io/amkn26/**`
 3. GitHub → **Settings → Pages** → Deploy from branch → `main` / `(root)`
-4. Kirjaudu sivulle kerran, aja sitten `supabase/03_omat_statukset.sql`.
 5. Lisää kurssilaisten osoitteet sovelluksen **Ylläpito**-välilehdellä.
 
 ## Tietosuoja

@@ -1,5 +1,5 @@
 -- =====================================================================
--- 2) Alkutiedot: ylläpitäjä, kurssit ja tehtävät
+-- 2) Alkutiedot: ylläpitäjä ja kurssit
 -- VAIHDA alla oleva sähköpostiosoite omaksesi ennen ajamista!
 -- =====================================================================
 
@@ -66,45 +66,5 @@ insert into public.courses (code, name) values
   ('YMPTU', 'Ympäristöturvallisuus')
 on conflict (code) do nothing;
 
-insert into public.tasks (seed_key, course, type, title, dl, moodle, info, created_by, updated_by) values
-  ('t001', 'ENSIH', 'Ryhmä', 'Tajuttomuus', '2026-11-20', '', '', null, null),
-  ('t002', 'ONNEH2', 'Ryhmä', 'Onnettomuuksien ehkäisyn oppimistehtävä', '2026-11-29', 'https://moodle.smedu.fi/course/section.php?id=36306', '', null, null),
-  ('t003', 'VIEHÄ', 'Yksilö', 'Oppimispäiväkirja, Suomi', '2026-11-30', 'https://moodle.smedu.fi/mod/assign/view.php?id=140519', '', null, null),
-  ('t004', 'PEPEO', 'Yksilö', 'Pedagogiikka ja oppiminen pelastusalalla (3 op)', '2026-12-11', '', 'Tehtävänanto tulee myöhemmin', null, null),
-  ('t005', 'RUSTÖ', 'Yksilö', 'Portfoliotehtävä', '2026-12-13', '', '', null, null),
-  ('t006', 'STUPE', 'Yksilö', 'STUPE Oppimispäiväkirja', '2027-01-10', '', '', null, null),
-  ('t007', 'STUPE', 'Yksilö', 'STUPE Oppimistehtävä 2', '2027-01-10', '', '', null, null),
-  ('t008', 'STUPE', 'Yksilö', 'STUPE Oppimistehtävä 3', '2027-01-10', '', '', null, null),
-  ('t009', 'RUSTÖ', 'Tentti', '', '2026-11-23', '', '', null, null),
-  ('t010', 'MA1', 'Tentti', '', '2026-12-02', '', '', null, null),
-  ('t011', 'PEPEO', 'Tentti', '', '2026-12-02', '', 'Moodlessa', null, null),
-  ('t012', 'SAPE1', 'Yksilö', 'Tieturva 1 - kurssi', '2026-08-12', '', '', null, null),
-  ('t013', 'MA1', 'Yksilö', 'Läksyt', '2026-09-09', 'https://moodle.smedu.fi/course/view.php?id=2928', '', null, null),
-  ('t014', 'RUSTÖ', 'Yksilö', 'Kirjoitelma: Minä ja ruotsin kieli', '2026-09-10', '', '', null, null),
-  ('t015', 'RAKTE1', 'Ryhmä', 'Pienoismalli ryhmätyö', '2026-09-11', '', 'Ei vielä julkaistu', null, null),
-  ('t016', 'VIEHÄ', 'Yksilö', 'Essee, viestinnän merkitys', '2026-09-11', 'https://moodle.smedu.fi/course/section.php?id=36106', 'Harjoitus viitteen ja lähteen merkitsemisestä', null, null),
-  ('t017', 'PFYPE', 'Ryhmä', 'Vedenkuljetuksen mittauspöytäkirja', '2026-09-13', 'https://moodle.smedu.fi/course/section.php?id=36193', 'Materiaali Teamsissä', null, null),
-  ('t018', 'VIEHÄ', 'Tentti', '', '2026-09-15', '', '', null, null),
-  ('t019', 'SAPE1', 'Ryhmä', 'Liikenneonnettomuuden oppimistehtävä', '2026-09-20', 'https://moodle.smedu.fi/mod/assign/view.php?id=133805', '', null, null),
-  ('t020', 'VIEHÄ', 'Yksilö', 'Harjoitus tiedotteen kirjoittamisesta', '2026-09-20', 'https://moodle.smedu.fi/course/section.php?id=36102', 'Moodle ei vielä auki', null, null),
-  ('t021', 'MA1', 'Yksilö', 'Läksyt', '2026-09-24', '', '', null, null),
-  ('t022', 'RAKTE1', 'Ryhmä', 'Materiaaliryhmätyö', '2026-09-30', '', '', null, null),
-  ('t023', 'SAPE1', 'Tentti', '', '2026-10-09', '', '', null, null),
-  ('t024', 'SAPE1', 'Ryhmä', 'PIPE2', '2026-10-09', '', '', null, null),
-  ('t025', 'SAPE1', 'Ryhmä', 'Perusselvitykset', '2026-10-09', '', '', null, null),
-  ('t026', 'VIEHÄ', 'Yksilö', 'Viehä Kielenhuolto', '2026-10-18', 'https://moodle.smedu.fi/course/section.php?id=36105', '', null, null),
-  ('t027', 'RUSTÖ', 'Tentti', '', '2026-10-27', '', '', null, null),
-  ('t028', 'PFYPE', 'Tentti', '', '2026-10-30', '', '', null, null),
-  ('t029', 'STUPE', 'Yksilö', 'STUPE Oppimistehtävä 1', '2026-11-01', '', '', null, null),
-  ('t030', 'OMAJO1', 'Yksilö', 'Oman johtajuuden kehittämissuunnitelma', '2026-11-03', 'https://moodle.smedu.fi/course/view.php?id=2135', '', null, null),
-  ('t031', 'RAKTE1', 'Tentti', '', '2026-11-17', '', 'Moodlessa (Läsnäolo)', null, null),
-  ('t032', 'ONNEH2', 'Ryhmä', 'Veturi tehtävä', '2026-11-17', '', '', null, null),
-  ('t033', 'PTJV', 'Yksilö', 'Paikkatietotehtävä', '2026-11-27', '', '', null, null),
-  ('t034', 'PTJV', 'Yksilö', 'eOppiva - Salassa pidettävien', '2026-11-27', '', 'Moodlessa', null, null),
-  ('t035', 'PTJV', 'Yksilö', 'eOppiva - Turvallisuusluokitellut asiakirjat', '2026-11-27', '', 'Moodlessa', null, null),
-  ('t036', 'ENSIH', 'Yksilö', 'Elvytysverkkokurssi', '2026-11-30', 'https://moodle.smedu.fi/mod/forum/view.php?id=140587', '', null, null),
-  ('t037', 'ENSIH', 'Yksilö', 'Defibrillaattori (vapaaehtoinen)', '2026-11-30', 'https://moodle.smedu.fi/mod/forum/view.php?id=140588', '', null, null),
-  ('t038', 'RAKTE1', 'Yksilö', 'Oppimistehtävä 2 Vesi- ja viemärijärjestelmät', '2026-12-04', 'https://moodle.smedu.fi/mod/assign/view.php?id=109019', '', null, null),
-  ('t039', 'RAKTE1', 'Yksilö', 'Oppimistehtävä 1 Rakennusvalvontajärjestelmä', '2026-12-04', 'https://moodle.smedu.fi/mod/assign/view.php?id=109018', '', null, null),
-  ('t040', 'RAKTE1', 'Yksilö', 'Piirrosmerkit', '2026-12-04', 'https://moodle.smedu.fi/course/section.php?id=30868', 'Päivämääriä ei vielä ilmoitettu', null, null)
-on conflict (seed_key) do nothing;
+-- Alkuperäiset tehtävät on tuotu tietokantaan erikseen, eikä niitä pidetä
+-- julkisessa repossa. Uudet tehtävät lisätään sovelluksen kautta.
