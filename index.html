@@ -49,6 +49,7 @@ textarea{width:100%;resize:vertical;min-height:38px}
 .type{font-size:12px;color:var(--muted);border:1px solid var(--line);padding:1px 7px;border-radius:6px}
 .type.tentti{color:var(--accent);border-color:var(--accent)}
 .type.priv{color:var(--info);border-color:var(--info)}
+.type.aud{color:var(--ink);border-color:var(--ink);font-weight:700}
 .when{margin-left:auto;font-size:13px;color:var(--muted);text-align:right;white-space:nowrap}
 .when b{color:var(--ink)}
 .late .when b{color:var(--accent)} .soon .when b{color:var(--warn)}
@@ -159,7 +160,7 @@ const isFinished = (s,t) => s==="Palautettu" || (t && t.type==="Tentti" && s==="
 const BASE = location.origin + location.pathname;
 
 const S = { token:null, me:null, view:"etusivu", courses:[], tasks:new Map(), mine:new Map(), members:[],
-  loaded:false, invalid:false, newLink:null, f:{ koriStatus:"aktiiviset", course:"", q:"", showPast:false } };
+  loaded:false, invalid:false, newLink:null, f:{ koriStatus:"aktiiviset", course:"", q:"", showPast:false, list:"minulle" } };
 
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -170,6 +171,10 @@ function fmtDate(dl){ if(!dl) return "ei DL:ää"; const [y,m,d]=dl.split("-"); 
 const courseName = code => (S.courses.find(c=>c.code===code)||{}).name || "";
 const effDl = (t,m) => (m && m.my_dl) || t.dl || "";
 const urg = d => d<0 ? "late" : d<3 ? "urgent" : d<7 ? "soon" : "";
+const AUD = [["","Kaikki"],["P","Pelastajat (P)"],["AP","Alipäällystö (AP)"],["P,AP","Pelastajat + alipäällystö (P+AP)"]];
+const audKey = t => (t.audience||[]).slice().sort((a,b)=>a==="P"?-1:1).join(",");
+const audBadge = t => { const k=audKey(t); return k ? `<span class="type aud">${k.replace(",","+")}</span>` : ""; };
+const visibleMine = id => { const m=S.mine.get(id); return m && !m.hidden ? m : null; };
 const isPast = t => { const d=daysLeft(t.dl); return d!==null && d<0; };
 const linkFor = tok => BASE + "#k=" + tok;
 
@@ -240,7 +245,7 @@ function card(task, mine, mode){
   const by = !task.private && task.created_by_name ? `<div class="by">Lisännyt: ${esc(task.created_by_name)}</div>` : "";
   const id = esc(task.id);
   let h = `<div class="card ${cls}" id="c-${id}">
-    <div class="row1"><span class="code">${esc(task.course)}</span><span class="type ${task.type==="Tentti"?"tentti":""}">${esc(task.type)}</span>${task.private?`<span class="type priv">🔒 Oma</span>`:""}
+    <div class="row1"><span class="code">${esc(task.course)}</span><span class="type ${task.type==="Tentti"?"tentti":""}">${esc(task.type)}</span>${audBadge(task)}${task.private?`<span class="type priv">🔒 Oma</span>`:""}
       <span class="when">${esc(fmtDate(dl))}${own}${whenTxt?` · <b>${whenTxt}</b>`:""}</span></div>
     <div class="title">${esc(task.title || (task.type==="Tentti"?"Tentti":"(nimetön)"))}</div>
     <div class="cname">${esc(courseName(task.course))}</div>
@@ -254,20 +259,22 @@ function card(task, mine, mode){
         </div></details>
       <div class="links">${url?`<a href="${esc(url)}" target="_blank" rel="noopener">Moodle ↗</a>`:""}<span style="flex:1"></span>
         <button class="btn ghost" data-act="edit" data-id="${id}">Muokkaa</button>
-        <button class="btn ghost" data-act="unbasket" data-id="${id}">Poista korista</button></div>`;
+        <button class="btn ghost" data-act="unbasket" data-id="${id}">Poista korista</button>
+        <button class="btn ghost" data-act="hide" data-id="${id}">Piilota</button></div>`;
   } else {
     h += by + `<div class="links">${url?`<a href="${esc(url)}" target="_blank" rel="noopener">Moodle ↗</a>`:""}<span style="flex:1"></span>
         <button class="btn ghost" data-act="edit" data-id="${id}">Muokkaa</button>
-        ${mine?`<button class="btn in" data-act="unbasket" data-id="${id}">✓ Korissa</button>`:`<button class="btn primary" data-act="basket" data-id="${id}">+ Koriin</button>`}</div>`;
+        ${mine && mine.hidden ? `<button class="btn" data-act="unhide" data-id="${id}">Palauta</button>`
+          : `<button class="btn ghost" data-act="hide" data-id="${id}">Piilota minulta</button>${mine?`<button class="btn in" data-act="unbasket" data-id="${id}">✓ Korissa</button>`:`<button class="btn primary" data-act="basket" data-id="${id}">+ Koriin</button>`}`}</div>`;
   }
   return h + `</div>`;
 }
 const byDl = (a,b) => { const x=a||"9999", y=b||"9999"; return x<y?-1:x>y?1:0; };
 function renderKori(){
   const items=[];
-  for(const [id,m0] of S.mine){ const t=S.tasks.get(id); if(!t) continue; const m={...m0,status:normStatus(m0.status,t)}; items.push({t,m,dl:effDl(t,m),fin:isFinished(m.status,t)}); }
+  for(const [id,m0] of S.mine){ const t=S.tasks.get(id); if(!t||m0.hidden) continue; const m={...m0,status:normStatus(m0.status,t)}; items.push({t,m,dl:effDl(t,m),fin:isFinished(m.status,t)}); }
   if(!items.length){
-    const up=[...S.tasks.values()].filter(t=>!isPast(t)).length;
+    const up=[...S.tasks.values()].filter(t=>!isPast(t)&&!S.mine.has(t.id)).length;
     return `<div class="empty"><p><b>Korisi on tyhjä.</b></p><p>Poimi tehtäviä yhteiseltä listalta, niin voit seurata niiden statusta.</p>
       ${up?`<button class="btn primary" data-act="basketAll">Lisää kaikki tulevat (${up}) koriin</button><br><br>`:""}
       <button class="btn" data-act="go" data-view="kaikki">Selaa tehtäviä</button></div>`;
@@ -283,7 +290,7 @@ function renderKori(){
 }
 function renderHome(){
   const rows=[];
-  for(const [id,m0] of S.mine){ const t=S.tasks.get(id); if(!t) continue; const st=normStatus(m0.status,t); if(isFinished(st,t)) continue; rows.push({t,st,dl:effDl(t,m0)}); }
+  for(const [id,m0] of S.mine){ const t=S.tasks.get(id); if(!t||m0.hidden) continue; const st=normStatus(m0.status,t); if(isFinished(st,t)) continue; rows.push({t,st,dl:effDl(t,m0)}); }
   rows.sort((a,b)=>byDl(a.dl,b.dl));
   const notIn=[...S.tasks.values()].filter(t=>!isPast(t)&&!S.mine.has(t.id)).length;
   let h=`<div class="hhead"><b>Tulossa</b><span class="muted">${rows.length} aktiivista</span></div>`;
@@ -295,17 +302,21 @@ function renderHome(){
       <td><span class="code">${esc(r.t.course)}</span></td>
       <td class="ttl">${r.t.type==="Tentti"?`<span class="tentti">Tentti</span> `:""}${esc(r.t.title||"")}</td>
       <td><span class="pill" data-s="${r.st}">${esc(statusLabel(r.st,r.t))}</span></td></tr>`;}).join("")}</tbody></table>`;
-  if(notIn) h+=`<div class="notice" style="margin-top:12px">${notIn} tulevaa tehtävää ei ole korissasi. <button class="btn ghost" data-act="go" data-view="kaikki">Näytä →</button></div>`;
+  if(notIn) h+=`<div class="notice" style="margin-top:12px"><b>${notIn} uutta tehtävää</b> käsittelemättä – lisää koriin tai piilota. <button class="btn ghost" data-act="goNew">Näytä →</button></div>`;
   return h;
 }
 function renderKaikki(){
+  const stOf = t => { const m=S.mine.get(t.id); return !m ? "uusi" : m.hidden ? "piil" : "kori"; };
+  const cnt = { uudet:[...S.tasks.values()].filter(t=>stOf(t)==="uusi"&&!isPast(t)).length, piilotetut:[...S.tasks.values()].filter(t=>stOf(t)==="piil").length };
   const used=[...new Set([...S.tasks.values()].map(t=>t.course))].sort();
   let h=`<div class="bar"><select data-act="fCourse"><option value="">Kaikki kurssit</option>${used.map(c=>`<option value="${esc(c)}" ${S.f.course===c?"selected":""}>${esc(c)} – ${esc(courseName(c))}</option>`).join("")}</select>
     <input type="search" data-act="fQ" placeholder="Hae…" value="${esc(S.f.q)}"></div>
-    <div class="chips"><button class="chip ${S.f.showPast?"":"on"}" data-act="past" data-v="0">Tulevat</button><button class="chip ${S.f.showPast?"on":""}" data-act="past" data-v="1">Myös menneet</button></div>`;
+    <div class="chips">${[["minulle","Minulle"],["uudet","Uudet"],["piilotetut","Piilotetut"],["kaikki","Kaikki"]].map(([k,l])=>`<button class="chip ${S.f.list===k?"on":""}" data-act="listF" data-k="${k}">${l}${k==="uudet"||k==="piilotetut"?`<b>${cnt[k]}</b>`:""}</button>`).join("")}
+      <span style="width:8px"></span><button class="chip ${S.f.showPast?"on":""}" data-act="past" data-v="${S.f.showPast?0:1}">Myös menneet</button></div>`;
   if(!S.tasks.size) return h+`<div class="empty"><p>Listalla ei ole vielä tehtäviä.</p><button class="btn primary" data-act="new">+ Lisää ensimmäinen</button></div>`;
   const q=S.f.q.trim().toLowerCase();
-  const list=[...S.tasks.values()].filter(t=>(!S.f.course||t.course===S.f.course)&&(S.f.showPast||!isPast(t))&&(!q||`${t.course} ${t.title} ${t.info} ${courseName(t.course)} ${t.type}`.toLowerCase().includes(q))).sort((a,b)=>byDl(a.dl,b.dl));
+  const lf={minulle:s=>s!=="piil",uudet:s=>s==="uusi",piilotetut:s=>s==="piil",kaikki:()=>true}[S.f.list];
+  const list=[...S.tasks.values()].filter(t=>lf(stOf(t))&&(!S.f.course||t.course===S.f.course)&&(S.f.showPast||S.f.list==="piilotetut"||!isPast(t))&&(!q||`${t.course} ${t.title} ${t.info} ${courseName(t.course)} ${t.type}`.toLowerCase().includes(q))).sort((a,b)=>byDl(a.dl,b.dl));
   if(!list.length) return h+`<div class="empty"><p>Ei hakua vastaavia tehtäviä.</p></div>`;
   const fut=list.filter(t=>!isPast(t)), past=list.filter(isPast).reverse();
   h += fut.map(t=>card(t,S.mine.get(t.id),"kaikki")).join("");
@@ -361,6 +372,7 @@ function openForm(id){
     <div class="two hidden" id="newCourse"><label>Lyhenne<input name="ncode" maxlength="12"></label><label>Kurssin nimi<input name="nname"></label></div>
     <div class="two"><label>Tyyppi<select name="type">${TYPES.map(x=>`<option ${x===t.type?"selected":""}>${x}</option>`).join("")}</select></label>
       <label>DL / tenttipäivä<input type="date" name="dl" value="${esc(t.dl||"")}"></label></div>
+    <label>Kohderyhmä<select name="aud">${AUD.map(([k,l])=>`<option value="${k}" ${k===audKey(t)?"selected":""}>${l}</option>`).join("")}</select></label>
     <label>Aihe<input name="title" value="${esc(t.title)}" placeholder="esim. Oppimispäiväkirja"></label>
     <label>Moodle-linkki<input name="moodle" type="url" value="${esc(t.moodle)}" placeholder="https://moodle.smedu.fi/…"></label>
     <label>Lisätiedot<textarea name="info" rows="2">${esc(t.info)}</textarea></label>
@@ -399,7 +411,7 @@ async function saveTask(f){
   btn.disabled=true;
   try{
     await rpc("app_save_task",{p_id:editing?editing.id:null,p_course:course,p_type:type,p_title:title,p_dl:f.dl.value||null,
-      p_moodle:moodle,p_info:f.info.value.trim(),p_new_course_name:newName,p_to_basket:!editing&&f.toBasket&&f.toBasket.checked,p_private:f.priv?f.priv.checked:false});
+      p_moodle:moodle,p_info:f.info.value.trim(),p_new_course_name:newName,p_to_basket:!editing&&f.toBasket&&f.toBasket.checked,p_private:f.priv?f.priv.checked:false,p_audience:f.aud.value?f.aud.value.split(","):[]});
     toast(editing?"Tallennettu":(f.priv&&f.priv.checked?"Henkilökohtainen tehtävä lisätty":"Tehtävä lisätty kaikille")); closeSheet(); loadAll();
   }catch(e){ btn.disabled=false; err(e.message||"Tallennus epäonnistui."); }
 }
@@ -426,10 +438,14 @@ document.addEventListener("click", async e=>{
   else if(a==="privacy") openPrivacy();
   else if(a==="logout"){ if(!confirmTwice("Varmasti? Tarvitset linkin uudelleen")) return; store("amkn26_token",null); S.token=null; S.loaded=false; S.me=null; render(); }
   else if(a==="jump"){ S.view="kori"; S.f.koriStatus="aktiiviset"; render(); const c=document.getElementById("c-"+id); if(c){ c.scrollIntoView({block:"center"}); c.style.outline="2px solid var(--info)"; setTimeout(()=>c.style.outline="",1500); } }
+  else if(a==="hide"){ const m=S.mine.get(id)||{task_id:id,status:"Annettu",note:"",my_dl:null}; S.mine.set(id,{...m,hidden:true}); render(); try{ await act("app_set_hidden",{p_task:id,p_hidden:true},"Piilotettu – löydät sen Piilotetut-suodattimesta"); }catch(_){ loadAll(); } }
+  else if(a==="unhide"){ try{ await act("app_set_hidden",{p_task:id,p_hidden:false},"Palautettu"); }finally{ loadAll(); } }
+  else if(a==="listF"){ S.f.list=b.dataset.k; render(); }
+  else if(a==="goNew"){ S.view="kaikki"; S.f.list="uudet"; render(); scrollTo(0,0); }
   else if(a==="koriFilter"){ S.f.koriStatus=b.dataset.k; render(); }
   else if(a==="past"){ S.f.showPast=b.dataset.v==="1"; render(); }
   else if(a==="status"){ const m=S.mine.get(id); if(m && normStatus(m.status,S.tasks.get(id))!==b.dataset.s) upsertMine(id,{status:b.dataset.s}); }
-  else if(a==="basket"){ await upsertMine(id,{status:"Annettu"}); toast("Lisätty koriin"); }
+  else if(a==="basket"){ await upsertMine(id,{status:"Annettu",hidden:false}); toast("Lisätty koriin"); }
   else if(a==="unbasket"){ if(!confirmTwice("Varmasti?")) return; S.mine.delete(id); render(); try{ await act("app_remove_basket",{p_task:id},"Poistettu korista"); }catch(_){ loadAll(); } }
   else if(a==="basketAll"){ b.disabled=true; const ids=[...S.tasks.values()].filter(t=>!isPast(t)).map(t=>t.id); await act("app_add_basket_many",{p_tasks:ids},`${ids.length} tehtävää lisätty koriin`); loadAll(); }
   else if(a==="del"){ if(!confirmTwice("Poistetaanko kaikilta?")) return; await act("app_delete_task",{p_id:editing.id},"Tehtävä poistettu"); closeSheet(); loadAll(); }
