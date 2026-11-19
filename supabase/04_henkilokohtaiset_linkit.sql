@@ -3,15 +3,9 @@
 -- Aja kerran SQL Editorissa. Poistaa sähköpostikirjautumisen rakenteet.
 -- =====================================================================
 
--- ---------- Vanhan kirjautumisen purku ----------
-drop trigger if exists check_allowed_signup on auth.users;
-drop function if exists public.check_allowed_signup();
-drop table if exists public.basket;
-drop table if exists public.profiles;
-drop table if exists public.allowed_emails;
-drop function if exists public.is_member();
-drop function if exists public.is_admin();
+begin;
 
+-- ---------- Vanhan kirjautumisen purku ----------
 drop policy if exists tasks_read   on public.tasks;
 drop policy if exists tasks_insert on public.tasks;
 drop policy if exists tasks_update on public.tasks;
@@ -20,6 +14,14 @@ drop policy if exists courses_read   on public.courses;
 drop policy if exists courses_insert on public.courses;
 drop policy if exists courses_admin  on public.courses;
 drop policy if exists courses_delete on public.courses;
+
+drop trigger if exists check_allowed_signup on auth.users;
+drop function if exists public.check_allowed_signup();
+drop table if exists public.basket;
+drop table if exists public.profiles;
+drop table if exists public.allowed_emails;
+drop function if exists public.is_member();
+drop function if exists public.is_admin();
 
 drop trigger if exists touch_task on public.tasks;
 drop function if exists public.touch_task();
@@ -199,3 +201,5 @@ grant execute on function
   public.app_delete_task(text,uuid), public.app_rename(text,text), public.app_add_member(text,text,boolean),
   public.app_reset_link(text,uuid), public.app_remove_member(text,uuid)
   to anon, authenticated;
+
+commit;
