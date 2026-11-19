@@ -124,7 +124,6 @@ table.adm td{padding:8px 4px;border-bottom:1px solid var(--line)}
 <div class="sheet-bg" id="sheetBg"><div class="sheet" id="sheet"></div></div>
 <div class="toast" id="toast"></div>
 
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="config.js"></script>
 <script>
 const STATUSES = ["Annettu","Aloitettu","Valmis","Palautettu"];
@@ -134,11 +133,10 @@ const statusesFor = t => t && t.type==="Tentti" ? EXAM_STATUSES : STATUSES;
 const statusLabel = (s,t) => t && t.type==="Tentti" ? ({Annettu:"Tulossa",Valmis:"Tehty"}[s]||s) : s;
 function normStatus(s,t){ if(!s) s="Annettu"; if(t && t.type==="Tentti"){ if(s==="Palautettu") s="Valmis"; else if(s==="Aloitettu") s="Annettu"; } return s; }
 const isFinished = (s,t) => s==="Palautettu" || (t && t.type==="Tentti" && s==="Valmis");
+const BASE = location.origin + location.pathname;
 
-const sb = supabase.createClient(window.APP_CONFIG.SUPABASE_URL, window.APP_CONFIG.SUPABASE_KEY);
-const S = { session:null, uid:null, admin:false, member:false, view:"kori",
-  courses:[], tasks:new Map(), mine:new Map(), names:{}, allowed:[], myName:"",
-  loaded:false, f:{ koriStatus:"aktiiviset", course:"", q:"", showPast:false } };
+const S = { token:null, me:null, view:"kori", courses:[], tasks:new Map(), mine:new Map(), members:[],
+  loaded:false, invalid:false, newLink:null, f:{ koriStatus:"aktiiviset", course:"", q:"", showPast:false } };
 
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -149,60 +147,61 @@ function fmtDate(dl){ if(!dl) return "ei DL:ää"; const [y,m,d]=dl.split("-"); 
 const courseName = code => (S.courses.find(c=>c.code===code)||{}).name || "";
 const effDl = (t,m) => (m && m.my_dl) || t.dl || "";
 const isPast = t => { const d=daysLeft(t.dl); return d!==null && d<0; };
-function fail(e, msg){ console.error(e); toast(msg || "Tallennus epäonnistui"); }
+const linkFor = tok => BASE + "#k=" + tok;
 
-/* ---------- data ---------- */
-async function loadAll(){
-  const [c,t,b,p] = await Promise.all([
-    sb.from("courses").select("code,name"),
-    sb.from("tasks").select("id,course,type,title,dl,moodle,info,created_by"),
-    sb.from("basket").select("task_id,status,note,my_dl").eq("user_id", S.uid),
-    sb.from("profiles").select("id,first_name")
-  ]);
-  if(c.error||t.error||b.error||p.error){ $("#status").textContent="latausvirhe"; console.error(c.error||t.error||b.error||p.error); }
-  S.courses = c.data||[];
-  S.tasks = new Map((t.data||[]).map(x=>[x.id,x]));
-  S.mine = new Map((b.data||[]).map(x=>[x.task_id,x]));
-  S.names = Object.fromEntries((p.data||[]).map(x=>[x.id,x.first_name]));
-  S.myName = S.names[S.uid] || "";
-  S.loaded = true;
-  if(S.admin){ const a=await sb.from("allowed_emails").select("email,is_admin,added_at").order("email"); S.allowed=a.data||[]; }
-  softRender();
-  if(!S.myName) openProfile(true);
+/* ---------- token ---------- */
+function store(k,v){ try{ v===null?localStorage.removeItem(k):localStorage.setItem(k,v); }catch(_){} }
+function readStore(k){ try{ return localStorage.getItem(k); }catch(_){ return null; } }
+(function grabToken(){
+  const m = location.hash.match(/k=([a-f0-9]{32,})/i);
+  if(m){ S.token=m[1]; store("amkn26_token",S.token); history.replaceState(null,"",BASE); }
+  else S.token = readStore("amkn26_token");
+})();
+
+/* ---------- api ---------- */
+async function rpc(fn, args={}){
+  const r = await fetch(`${APP_CONFIG.SUPABASE_URL}/rest/v1/rpc/${fn}`, { method:"POST",
+    headers:{ "apikey":APP_CONFIG.SUPABASE_KEY, "Content-Type":"application/json" },
+    body: JSON.stringify({ p_token:S.token, ...args }) });
+  const txt = await r.text(); let data=null; try{ data = txt ? JSON.parse(txt) : null; }catch(_){ data=txt; }
+  if(!r.ok){ const e=new Error((data&&data.message)||"Virhe"); e.code=data&&data.code; throw e; }
+  return data;
 }
+async function loadAll(){
+  if(!S.token){ render(); return; }
+  try{
+    const st = await rpc("app_state");
+    S.me=st.me; S.courses=st.courses||[]; S.tasks=new Map((st.tasks||[]).map(t=>[t.id,t]));
+    S.mine=new Map((st.basket||[]).map(b=>[b.task_id,b])); S.members=st.members||[];
+    S.loaded=true; S.invalid=false; $("#status").textContent="";
+  }catch(e){
+    if(e.code==="28000"){ S.invalid=true; store("amkn26_token",null); S.token=null; }
+    else $("#status").textContent="ei yhteyttä";
+    console.error(e);
+  }
+  softRender();
+}
+async function act(fn,args,okMsg){ try{ const r=await rpc(fn,args); if(okMsg) toast(okMsg); return r; }catch(e){ toast(e.message||"Tallennus epäonnistui"); throw e; } }
 async function upsertMine(task_id, patch){
   const cur = S.mine.get(task_id) || {task_id,status:"Annettu",note:"",my_dl:null};
-  const row = {...cur, ...patch, user_id:S.uid, task_id};
-  S.mine.set(task_id, row); softRender();
-  const {error} = await sb.from("basket").upsert(row);
-  if(error){ fail(error); await loadAll(); }
-}
-async function removeMine(task_id){
-  S.mine.delete(task_id); render();
-  const {error} = await sb.from("basket").delete().eq("user_id",S.uid).eq("task_id",task_id);
-  if(error){ fail(error,"Poisto epäonnistui"); await loadAll(); } else toast("Poistettu korista");
+  const row = {...cur, ...patch}; S.mine.set(task_id,row); softRender();
+  try{ await act("app_set_basket",{p_task:task_id,p_status:row.status,p_note:row.note||"",p_my_dl:row.my_dl||null}); }catch(_){ loadAll(); }
 }
 
 /* ---------- render ---------- */
 function render(){
-  const logged = !!S.session && S.member;
-  $("#nav").classList.toggle("hidden", !logged);
-  $("#navAdmin").classList.toggle("hidden", !S.admin);
-  $("#fab").classList.toggle("hidden", !logged || S.view==="admin");
+  const ok = S.loaded && S.me;
+  $("#nav").classList.toggle("hidden", !ok);
+  $("#navAdmin").classList.toggle("hidden", !(ok && S.me.is_admin));
+  $("#fab").classList.toggle("hidden", !ok || S.view==="admin");
   document.querySelectorAll("nav button").forEach(b=>b.classList.toggle("on", b.dataset.view===S.view));
-  if(!S.session){ $("#main").innerHTML = loginView(); return; }
-  if(!S.member){ $("#main").innerHTML = `<div class="login"><h2>Ei käyttöoikeutta</h2><p>Osoitettasi ei löydy kurssin jäsenlistalta. Pyydä ylläpitäjää lisäämään sinut.</p><button class="btn" data-act="logout">Kirjaudu ulos</button></div>`; return; }
+  if(!S.token){ $("#main").innerHTML = `<div class="login"><h2>${S.invalid?"Linkki ei ole enää voimassa":"Avaa henkilökohtainen linkkisi"}</h2>
+    <p>${S.invalid?"Pyydä ylläpitäjältä uusi linkki.":"Sovellusta käytetään ylläpitäjältä saadulla henkilökohtaisella linkillä. Avaa linkki tällä laitteella, niin sovellus muistaa sinut."}</p></div>
+    <div class="foot"><button data-act="privacy">Mitä tietoja tallennetaan</button></div>`; return; }
   if(!S.loaded){ $("#main").innerHTML = `<div class="empty">Ladataan…</div>`; return; }
   const v = S.view==="kori" ? renderKori() : S.view==="kaikki" ? renderKaikki() : renderAdmin();
-  $("#main").innerHTML = v + `<div class="foot">${S.myName?`Kirjautuneena: ${esc(S.myName)}`:""}<br>
-    <button data-act="profile">Oma nimi</button>·<button data-act="privacy">Mitä tietoja tallennetaan</button>·<button data-act="logout">Kirjaudu ulos</button></div>`;
-}
-function loginView(){
-  return `<div class="login"><h2>Kirjaudu</h2><p>Syötä sähköpostiosoitteesi. Saat sähköpostiin kirjautumislinkin – salasanaa ei tarvita.</p>
-    <form id="loginForm"><input type="email" name="email" required placeholder="nimi@esimerkki.fi" autocomplete="email">
-    <button class="btn primary" type="submit">Lähetä kirjautumislinkki</button></form>
-    <p id="loginMsg" style="margin:12px 0 0"></p></div>
-    <div class="foot"><button data-act="privacy">Mitä tietoja tallennetaan</button></div>`;
+  $("#main").innerHTML = v + `<div class="foot">Kirjautuneena: ${esc(S.me.first_name)}<br>
+    <button data-act="profile">Oma nimi</button>·<button data-act="privacy">Mitä tietoja tallennetaan</button>·<button data-act="logout">Unohda tämä laite</button></div>`;
 }
 function card(task, mine, mode){
   const dl = effDl(task, mine), d = daysLeft(dl);
@@ -214,7 +213,7 @@ function card(task, mine, mode){
   const whenTxt = d===null ? "" : d<0 ? `${-d} vrk sitten` : d===0 ? "tänään" : d===1 ? "huomenna" : `${d} vrk`;
   const url = safeUrl(task.moodle);
   const own = mine && mine.my_dl && mine.my_dl!==task.dl ? ` <span class="muted">(oma DL)</span>` : "";
-  const by = task.created_by && S.names[task.created_by] ? `<div class="by">Lisännyt: ${esc(S.names[task.created_by])}</div>` : "";
+  const by = task.created_by_name ? `<div class="by">Lisännyt: ${esc(task.created_by_name)}</div>` : "";
   const id = esc(task.id);
   let h = `<div class="card ${cls}">
     <div class="row1"><span class="code">${esc(task.course)}</span><span class="type ${task.type==="Tentti"?"tentti":""}">${esc(task.type)}</span>
@@ -240,10 +239,9 @@ function card(task, mine, mode){
   return h + `</div>`;
 }
 const byDl = (a,b) => { const x=a||"9999", y=b||"9999"; return x<y?-1:x>y?1:0; };
-
 function renderKori(){
-  const items=[], orphans=[];
-  for(const [id,m0] of S.mine){ const t=S.tasks.get(id); if(!t){orphans.push(id);continue;} const m={...m0,status:normStatus(m0.status,t)}; items.push({t,m,dl:effDl(t,m),fin:isFinished(m.status,t)}); }
+  const items=[];
+  for(const [id,m0] of S.mine){ const t=S.tasks.get(id); if(!t) continue; const m={...m0,status:normStatus(m0.status,t)}; items.push({t,m,dl:effDl(t,m),fin:isFinished(m.status,t)}); }
   if(!items.length){
     const up=[...S.tasks.values()].filter(t=>!isPast(t)).length;
     return `<div class="empty"><p><b>Korisi on tyhjä.</b></p><p>Poimi tehtäviä yhteiseltä listalta, niin voit seurata niiden statusta.</p>
@@ -273,41 +271,48 @@ function renderKaikki(){
   if(past.length) h += `<div class="group">Menneet</div>`+past.map(t=>card(t,S.mine.get(t.id),"kaikki")).join("");
   return h;
 }
+function linkBox(name, tok){
+  const l=linkFor(tok);
+  return `<div class="notice warn"><b>Linkki: ${esc(name)}</b><br><span class="muted">Kopioi ja lähetä nyt – linkkiä ei näytetä uudelleen. Tarvittaessa voit luoda uuden.</span>
+    <input readonly value="${esc(l)}" style="width:100%;margin-top:8px" onclick="this.select()">
+    <button class="btn primary" data-act="copy" data-link="${esc(l)}">Kopioi linkki</button> <button class="btn ghost" data-act="hideLink">Valmis</button></div>`;
+}
 function renderAdmin(){
-  return `<div class="notice"><b>Kurssin jäsenet</b><br><span class="muted">Vain listalla olevat osoitteet voivat kirjautua. Poistettu osoite menettää pääsyn heti.</span>
-    <form id="addEmail" class="bar" style="margin-top:10px"><input type="email" name="email" required placeholder="uusi@osoite.fi" style="flex:1">
-    <button class="btn primary" type="submit">Lisää</button></form>
-    <details><summary class="muted" style="cursor:pointer">Lisää useita kerralla</summary>
-      <form id="addMany" style="margin-top:8px"><textarea name="list" rows="4" placeholder="Yksi osoite per rivi"></textarea><button class="btn" type="submit" style="margin-top:6px">Lisää kaikki</button></form></details>
-    <table class="adm" style="margin-top:10px">${S.allowed.map(a=>`<tr><td>${esc(a.email)}${a.is_admin?` <span class="type">ylläpitäjä</span>`:""}</td>
-      <td style="text-align:right">${a.is_admin?"":`<button class="btn ghost" data-act="rmEmail" data-email="${esc(a.email)}">Poista</button>`}</td></tr>`).join("")}</table>
-    <p class="muted">${S.allowed.length} jäsentä</p></div>`;
+  const ago = t => !t ? "ei vielä käyttänyt" : "käytti viimeksi " + new Date(t).toLocaleDateString("fi-FI");
+  return (S.newLink?linkBox(S.newLink.name,S.newLink.tok):"") + `<div class="notice"><b>Kurssin jäsenet</b><br>
+    <span class="muted">Jokainen jäsen saa oman linkin. Jos linkki joutuu vääriin käsiin, luo uusi – vanha lakkaa toimimasta heti.</span>
+    <form id="addMember" class="bar" style="margin-top:10px"><input name="n" required maxlength="30" placeholder="Etunimi" style="flex:1">
+    <button class="btn primary" type="submit">Luo linkki</button></form>
+    <table class="adm">${S.members.map(m=>`<tr><td>${esc(m.first_name)}${m.is_admin?` <span class="type">ylläpitäjä</span>`:""}<br><span class="muted">${ago(m.last_seen)}</span></td>
+      <td style="text-align:right;white-space:nowrap"><button class="btn ghost" data-act="reset" data-mid="${esc(m.id)}" data-name="${esc(m.first_name)}">Uusi linkki</button>
+      ${m.id===S.me.id?"":`<button class="btn ghost" data-act="rmMember" data-mid="${esc(m.id)}">Poista</button>`}</td></tr>`).join("")}</table>
+    <p class="muted">${S.members.length} jäsentä</p></div>`;
 }
 
 /* ---------- forms ---------- */
 let editing=null;
 function openSheet(html){ $("#sheet").innerHTML=html; $("#sheetBg").classList.add("open"); }
 function closeSheet(){ $("#sheetBg").classList.remove("open"); editing=null; }
-function openProfile(first){
-  openSheet(`<h2>${first?"Tervetuloa!":"Oma nimi"}</h2><form class="form" id="profForm">
-    <p class="muted" style="margin:0">Tallennamme sinusta vain etunimen tai nimimerkin. Se näkyy muille vain tehtävän lisääjänä.</p>
-    <label>Etunimi tai nimimerkki<input name="n" maxlength="30" required value="${esc(S.myName)}"></label>
-    <div class="err" id="perr"></div><div class="actions">${first?"":`<button type="button" class="btn" data-act="close">Peruuta</button>`}<button class="btn primary" type="submit">Tallenna</button></div></form>`);
+function openProfile(){
+  openSheet(`<h2>Oma nimi</h2><form class="form" id="profForm">
+    <p class="muted" style="margin:0">Tallennamme sinusta vain etunimen tai nimimerkin. Se näkyy muille tehtävän lisääjänä.</p>
+    <label>Etunimi tai nimimerkki<input name="n" maxlength="30" required value="${esc(S.me.first_name)}"></label>
+    <div class="actions"><button type="button" class="btn" data-act="close">Peruuta</button><button class="btn primary" type="submit">Tallenna</button></div></form>`);
 }
 function openPrivacy(){
   openSheet(`<h2>Mitä tietoja tallennetaan</h2><div class="txt"><ul>
-    <li><b>Sähköpostiosoite</b> – kirjautumista varten. Näkyy vain ylläpitäjälle, ei muille käyttäjille.</li>
-    <li><b>Etunimi tai nimimerkki</b> – näkyy muille vain tehtävän lisääjänä. Sukunimeä ei tallenneta.</li>
+    <li><b>Etunimi tai nimimerkki</b> – näkyy muille vain tehtävän lisääjänä. Sukunimiä tai sähköpostiosoitteita ei tallenneta.</li>
     <li><b>Oma kori</b> (statukset, muistiinpanot, oma DL) – vain sinä näet nämä.</li>
-    <li><b>Yhteiset tehtävät ja kurssit</b> – näkyvät kaikille kurssin jäsenille.</li></ul>
-    <p>Tiedot säilytetään EU:ssa (Supabase). Kirjautumattomat eivät näe mitään. Voit pyytää ylläpitäjää poistamaan tietosi milloin tahansa.</p></div>
+    <li><b>Yhteiset tehtävät ja kurssit</b> – näkyvät kaikille kurssin jäsenille.</li>
+    <li><b>Viimeisin käyttöpäivä</b> – näkyy ylläpitäjälle.</li></ul>
+    <p>Pääsy on vain henkilökohtaisella linkillä. Älä jaa omaa linkkiäsi – sillä pääsee omaan koriisi. Tiedot säilytetään EU:ssa (Supabase). Ylläpitäjä poistaa tietosi pyynnöstä.</p></div>
     <div class="actions"><button class="btn" data-act="close">Sulje</button></div>`);
 }
 function openForm(id){
   editing = id ? S.tasks.get(id) : null;
   const t = editing || {course:S.f.course||"",type:"Yksilö",title:"",dl:"",moodle:"",info:""};
   const courses=[...S.courses].sort((a,b)=>a.code.localeCompare(b.code,"fi"));
-  const canDel = editing && (S.admin || editing.created_by===S.uid);
+  const canDel = editing && (S.me.is_admin || editing.created_by===S.me.id);
   openSheet(`<h2>${editing?"Muokkaa tehtävää":"Lisää tehtävä"}</h2><form class="form" id="taskForm" novalidate>
     <label>Kurssi<select name="course"><option value="">Valitse kurssi…</option>
       ${courses.map(c=>`<option value="${esc(c.code)}" ${c.code===t.course?"selected":""}>${esc(c.code)} – ${esc(c.name)}</option>`).join("")}
@@ -332,119 +337,70 @@ function openForm(id){
 }
 async function saveTask(f){
   const err=m=>{$("#ferr").textContent=m;};
-  let course=f.course.value; if(!course) return err("Valitse kurssi.");
-  if(course==="__new"){
-    const code=f.ncode.value.trim().toUpperCase(), name=f.nname.value.trim();
-    if(!code||!name) return err("Anna uuden kurssin lyhenne ja nimi.");
-    if(!S.courses.find(c=>c.code===code)){ const {error}=await sb.from("courses").insert({code,name}); if(error) return err("Kurssin lisäys epäonnistui."); S.courses.push({code,name}); }
-    course=code;
-  }
+  let course=f.course.value, newName=null; if(!course) return err("Valitse kurssi.");
+  if(course==="__new"){ course=f.ncode.value.trim().toUpperCase(); newName=f.nname.value.trim(); if(!course||!newName) return err("Anna uuden kurssin lyhenne ja nimi."); }
   const moodle=f.moodle.value.trim(); if(moodle&&!safeUrl(moodle)) return err("Moodle-linkin pitää alkaa https://");
-  const data={course,type:f.type.value,title:f.title.value.trim(),dl:f.dl.value||null,moodle,info:f.info.value.trim()};
-  if(!data.title && data.type!=="Tentti") return err("Anna tehtävälle aihe.");
-  f.querySelector("[type=submit]").disabled=true;
-  if(editing){
-    const {error}=await sb.from("tasks").update(data).eq("id",editing.id);
-    if(error){ f.querySelector("[type=submit]").disabled=false; return err("Tallennus epäonnistui."); }
-    toast("Tallennettu");
-  } else {
-    const {data:row,error}=await sb.from("tasks").insert({...data,created_by:S.uid,updated_by:S.uid}).select().single();
-    if(error){ f.querySelector("[type=submit]").disabled=false; return err("Tallennus epäonnistui."); }
-    if(f.toBasket&&f.toBasket.checked) await sb.from("basket").upsert({user_id:S.uid,task_id:row.id,status:"Annettu"});
-    toast("Tehtävä lisätty kaikille");
-  }
-  closeSheet(); await loadAll();
+  const title=f.title.value.trim(), type=f.type.value;
+  if(!title && type!=="Tentti") return err("Anna tehtävälle aihe.");
+  const btn=f.querySelector("[type=submit]"); btn.disabled=true;
+  try{
+    await rpc("app_save_task",{p_id:editing?editing.id:null,p_course:course,p_type:type,p_title:title,p_dl:f.dl.value||null,
+      p_moodle:moodle,p_info:f.info.value.trim(),p_new_course_name:newName,p_to_basket:!editing&&f.toBasket&&f.toBasket.checked});
+    toast(editing?"Tallennettu":"Tehtävä lisätty kaikille"); closeSheet(); loadAll();
+  }catch(e){ btn.disabled=false; err(e.message||"Tallennus epäonnistui."); }
 }
 
 /* ---------- events ---------- */
 document.addEventListener("submit", async e=>{
   e.preventDefault(); const f=e.target;
-  if(f.id==="loginForm"){
-    const email=f.email.value.trim().toLowerCase(); const b=f.querySelector("button"); b.disabled=true;
-    const {error}=await sb.auth.signInWithOtp({email,options:{emailRedirectTo:location.origin+location.pathname}});
-    $("#loginMsg").textContent = error ? (/allowed|sallittujen|Database error/i.test(error.message) ? "Osoitetta ei löydy kurssin jäsenlistalta." : "Linkin lähetys epäonnistui. Yritä hetken päästä uudelleen.") : "Linkki lähetetty! Avaa sähköposti ja paina linkkiä tällä laitteella.";
-    b.disabled=false;
-  } else if(f.id==="taskForm") saveTask(f);
-  else if(f.id==="profForm"){
-    const n=f.n.value.trim(); if(!n) return;
-    const {error}=await sb.from("profiles").upsert({id:S.uid,first_name:n});
-    if(error) return $("#perr").textContent="Tallennus epäonnistui.";
-    S.myName=n; S.names[S.uid]=n; closeSheet(); render();
-  } else if(f.id==="addEmail"||f.id==="addMany"){
-    const raw = f.id==="addEmail" ? [f.email.value] : f.list.value.split(/[\s,;]+/);
-    const rows=[...new Set(raw.map(x=>x.trim().toLowerCase()).filter(x=>/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(x)))].map(email=>({email}));
-    if(!rows.length) return toast("Ei kelvollisia osoitteita");
-    const {error}=await sb.from("allowed_emails").upsert(rows,{onConflict:"email",ignoreDuplicates:true});
-    if(error) return fail(error); toast(`${rows.length} osoitetta lisätty`); await loadAll();
-  }
+  if(f.id==="taskForm") saveTask(f);
+  else if(f.id==="profForm"){ const n=f.n.value.trim(); if(!n) return; await act("app_rename",{p_name:n},"Tallennettu"); closeSheet(); loadAll(); }
+  else if(f.id==="addMember"){ const n=f.n.value.trim(); if(!n) return; const tok=await act("app_add_member",{p_name:n,p_admin:false}); S.newLink={name:n,tok}; loadAll(); }
 });
 document.addEventListener("click", async e=>{
   const nb=e.target.closest("nav button"); if(nb){ S.view=nb.dataset.view; render(); scrollTo(0,0); return; }
   if(e.target.id==="fab") return openForm();
-  if(e.target.id==="sheetBg" && S.myName) return closeSheet();
+  if(e.target.id==="sheetBg") return closeSheet();
   const b=e.target.closest("[data-act]"); if(!b||["TEXTAREA","INPUT","SELECT"].includes(b.tagName)) return;
-  const id=b.dataset.id, act=b.dataset.act;
-  if(act==="go"){ S.view=b.dataset.view; render(); }
-  else if(act==="new") openForm();
-  else if(act==="close") closeSheet();
-  else if(act==="edit") openForm(id);
-  else if(act==="profile") openProfile(false);
-  else if(act==="privacy") openPrivacy();
-  else if(act==="logout"){ await sb.auth.signOut(); }
-  else if(act==="koriFilter"){ S.f.koriStatus=b.dataset.k; render(); }
-  else if(act==="past"){ S.f.showPast=b.dataset.v==="1"; render(); }
-  else if(act==="status"){ const m=S.mine.get(id); if(m && normStatus(m.status,S.tasks.get(id))!==b.dataset.s) upsertMine(id,{status:b.dataset.s}); }
-  else if(act==="basket"){ await upsertMine(id,{status:"Annettu"}); toast("Lisätty koriin"); }
-  else if(act==="unbasket"){
-    if(b.dataset.confirm!=="1"){ b.dataset.confirm="1"; b.textContent="Varmasti?"; setTimeout(()=>{ if(b.isConnected) render(); },3000); return; }
-    removeMine(id);
-  }
-  else if(act==="basketAll"){
-    b.disabled=true; const rows=[...S.tasks.values()].filter(t=>!isPast(t)&&!S.mine.has(t.id)).map(t=>({user_id:S.uid,task_id:t.id,status:"Annettu"}));
-    const {error}=await sb.from("basket").upsert(rows); if(error) fail(error); else toast(`${rows.length} tehtävää lisätty koriin`); await loadAll();
-  }
-  else if(act==="del"){
-    if(b.dataset.confirm!=="1"){ b.dataset.confirm="1"; b.textContent="Poistetaanko kaikilta?"; return; }
-    const {error}=await sb.from("tasks").delete().eq("id",editing.id); if(error) return fail(error,"Poisto epäonnistui");
-    closeSheet(); toast("Tehtävä poistettu"); await loadAll();
-  }
-  else if(act==="rmEmail"){
-    if(b.dataset.confirm!=="1"){ b.dataset.confirm="1"; b.textContent="Varmasti?"; return; }
-    const {error}=await sb.from("allowed_emails").delete().eq("email",b.dataset.email); if(error) return fail(error,"Poisto epäonnistui");
-    toast("Osoite poistettu"); await loadAll();
-  }
+  const id=b.dataset.id, a=b.dataset.act;
+  const confirmTwice = txt => { if(b.dataset.confirm!=="1"){ b.dataset.confirm="1"; b.textContent=txt; setTimeout(()=>{ if(b.isConnected) render(); },3500); return false; } return true; };
+  if(a==="go"){ S.view=b.dataset.view; render(); }
+  else if(a==="new") openForm();
+  else if(a==="close") closeSheet();
+  else if(a==="edit") openForm(id);
+  else if(a==="profile") openProfile();
+  else if(a==="privacy") openPrivacy();
+  else if(a==="logout"){ if(!confirmTwice("Varmasti? Tarvitset linkin uudelleen")) return; store("amkn26_token",null); S.token=null; S.loaded=false; S.me=null; render(); }
+  else if(a==="koriFilter"){ S.f.koriStatus=b.dataset.k; render(); }
+  else if(a==="past"){ S.f.showPast=b.dataset.v==="1"; render(); }
+  else if(a==="status"){ const m=S.mine.get(id); if(m && normStatus(m.status,S.tasks.get(id))!==b.dataset.s) upsertMine(id,{status:b.dataset.s}); }
+  else if(a==="basket"){ await upsertMine(id,{status:"Annettu"}); toast("Lisätty koriin"); }
+  else if(a==="unbasket"){ if(!confirmTwice("Varmasti?")) return; S.mine.delete(id); render(); try{ await act("app_remove_basket",{p_task:id},"Poistettu korista"); }catch(_){ loadAll(); } }
+  else if(a==="basketAll"){ b.disabled=true; const ids=[...S.tasks.values()].filter(t=>!isPast(t)).map(t=>t.id); await act("app_add_basket_many",{p_tasks:ids},`${ids.length} tehtävää lisätty koriin`); loadAll(); }
+  else if(a==="del"){ if(!confirmTwice("Poistetaanko kaikilta?")) return; await act("app_delete_task",{p_id:editing.id},"Tehtävä poistettu"); closeSheet(); loadAll(); }
+  else if(a==="reset"){ if(!confirmTwice("Vanha linkki lakkaa toimimasta – OK?")) return; const tok=await act("app_reset_link",{p_member:b.dataset.mid});
+    if(b.dataset.mid===S.me.id){ S.token=tok; store("amkn26_token",tok); } S.newLink={name:b.dataset.name,tok}; render(); }
+  else if(a==="rmMember"){ if(!confirmTwice("Poistetaanko jäsen ja hänen korinsa?")) return; await act("app_remove_member",{p_member:b.dataset.mid},"Jäsen poistettu"); loadAll(); }
+  else if(a==="copy"){ try{ await navigator.clipboard.writeText(b.dataset.link); toast("Linkki kopioitu"); }catch(_){ toast("Kopioi linkki kentästä"); } }
+  else if(a==="hideLink"){ S.newLink=null; render(); }
 });
 document.addEventListener("change", e=>{
-  const el=e.target, act=el.dataset&&el.dataset.act; if(!act) return;
+  const el=e.target, a=el.dataset&&el.dataset.act; if(!a) return;
   const m=S.mine.get(el.dataset.id);
-  if(act==="note" && m && (m.note||"")!==el.value) upsertMine(el.dataset.id,{note:el.value});
-  else if(act==="myDl" && m && (m.my_dl||"")!==el.value) upsertMine(el.dataset.id,{my_dl:el.value||null});
-  else if(act==="fCourse"){ S.f.course=el.value; render(); }
+  if(a==="note" && m && (m.note||"")!==el.value) upsertMine(el.dataset.id,{note:el.value});
+  else if(a==="myDl" && m && (m.my_dl||"")!==el.value) upsertMine(el.dataset.id,{my_dl:el.value||null});
+  else if(a==="fCourse"){ S.f.course=el.value; render(); }
 });
 let qT; document.addEventListener("input", e=>{
   if(e.target.dataset && e.target.dataset.act==="fQ"){ const el=e.target; clearTimeout(qT); qT=setTimeout(()=>{ S.f.q=el.value; const p=el.selectionStart; render(); const n=$('[data-act=fQ]'); if(n){n.focus(); n.setSelectionRange(p,p);} },250); }
 });
 let pending=false;
-function softRender(){ const a=document.activeElement; if(a&&(a.tagName==="TEXTAREA"||(a.tagName==="INPUT"&&a.type!=="search"))&&$("#main").contains(a)){ pending=true; return; } render(); }
+function softRender(){ const a=document.activeElement; if(a&&(a.tagName==="TEXTAREA"||(a.tagName==="INPUT"&&a.type!=="search"&&!a.readOnly))&&$("#main").contains(a)){ pending=true; return; } render(); }
 document.addEventListener("focusout",()=>{ if(pending){ pending=false; setTimeout(render,50); } });
-document.addEventListener("visibilitychange",()=>{ if(!document.hidden && S.member) loadAll(); });
-
-/* ---------- auth ---------- */
-let channel=null;
-async function onSession(session){
-  S.session=session; S.uid=session?session.user.id:null; S.loaded=false; S.member=false; S.admin=false;
-  if(channel){ sb.removeChannel(channel); channel=null; }
-  render();
-  if(!session) return;
-  const [m,a]=await Promise.all([sb.rpc("is_member"),sb.rpc("is_admin")]);
-  S.member=!!m.data; S.admin=!!a.data; render();
-  if(!S.member) return;
-  await loadAll();
-  let rt; channel=sb.channel("live").on("postgres_changes",{event:"*",schema:"public",table:"tasks"},()=>{ clearTimeout(rt); rt=setTimeout(loadAll,400); })
-    .on("postgres_changes",{event:"*",schema:"public",table:"courses"},()=>{ clearTimeout(rt); rt=setTimeout(loadAll,400); }).subscribe();
-}
-let lastUid;
-sb.auth.onAuthStateChange((ev,session)=>{ const uid=session?session.user.id:null; if(uid!==lastUid || ev==="SIGNED_OUT"){ lastUid=uid; setTimeout(()=>onSession(session),0); } else S.session=session; });
+document.addEventListener("visibilitychange",()=>{ if(!document.hidden && S.token) loadAll(); });
+setInterval(()=>{ if(!document.hidden && S.token) loadAll(); }, 60000);
+window.addEventListener("hashchange",()=>{ const m=location.hash.match(/k=([a-f0-9]{32,})/i); if(m){ S.token=m[1]; store("amkn26_token",S.token); history.replaceState(null,"",BASE); S.loaded=false; loadAll(); } });
+loadAll();
 </script>
 </body>
 </html>

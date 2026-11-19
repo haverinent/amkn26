@@ -2,18 +2,16 @@
 
 Kurssin yhteinen oppimistehtävien ja tenttien seuranta. Tehtävät ovat yhteisiä, ja jokaisella on oma kori, jossa hän seuraa omaa statustaan.
 
-- **Sivu:** GitHub Pages (`index.html`, `config.js`)
-- **Tietokanta ja kirjautuminen:** Supabase (EU). Kirjautuminen sähköpostiin lähetettävällä linkillä, ja pääsy vain sallittujen listalla oleville.
+- **Sivu:** GitHub Pages (`index.html`, `config.js`) – https://haverinent.github.io/amkn26/
+- **Tietokanta:** Supabase (EU)
+- **Pääsy:** henkilökohtaisella linkillä (`…/amkn26/#k=…`). Sähköposteja ei tallenneta.
 
-## Käyttöönotto
-1. Supabase → **SQL Editor**: aja järjestyksessä
-   1. `supabase/01_schema.sql` (taulut ja käyttöoikeudet)
-   2. `supabase/02_seed.sql` (vaihda ensin oma sähköpostisi riville `OMA@SAHKOPOSTI.FI` – vain SQL Editoriin, ei repoon)
-2. Supabase → **Authentication → URL Configuration**
-   - Site URL: `https://haverinent.github.io/amkn26/`
-   - Redirect URLs: `https://haverinent.github.io/amkn26/**`
-3. GitHub → **Settings → Pages** → Deploy from branch → `main` / `(root)`
-5. Lisää kurssilaisten osoitteet sovelluksen **Ylläpito**-välilehdellä.
+## Käyttöönotto (Supabase → SQL Editor)
+1. `supabase/01_schema.sql` – perustaulut
+2. `supabase/02_seed.sql` – kurssilista
+3. `supabase/04_henkilokohtaiset_linkit.sql` – linkkipohjainen pääsy ja käyttöoikeudet
+4. Ylläpitäjän ensimmäinen linkki luodaan erillisellä SQL:llä (ei repossa).
+5. Muiden linkit luodaan sovelluksen **Ylläpito**-välilehdellä.
 
 ## Tietosuoja
-Tallennetaan vain sähköposti (kirjautuminen, näkyy vain ylläpitäjälle), etunimi tai nimimerkki ja omat statukset. Repossa ei ole henkilötietoja. `config.js`:n avain on julkinen *publishable*-avain, ja varsinainen suojaus on tietokannan RLS-säännöissä.
+Tallennetaan vain etunimi tai nimimerkki, omat statukset ja viimeisin käyttöpäivä. Linkeistä tallennetaan vain tiiviste (SHA-256), joten tietokannasta ei voi lukea niitä. Taulut ovat lukossa, ja kaikki toiminnot kulkevat linkin tarkistavien funktioiden kautta. `config.js`:n avain on julkinen *publishable*-avain.
