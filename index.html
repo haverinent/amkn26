@@ -108,6 +108,8 @@ table.tight{width:100%;border-collapse:collapse;background:var(--card);border:1p
 table.tight th{text-align:left;font-size:11.5px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);font-weight:600;padding:7px 6px;border-bottom:1px solid var(--line)}
 table.tight td{padding:7px 6px;border-bottom:1px solid var(--line);vertical-align:middle;white-space:nowrap}
 table.tight tr:last-child td{border-bottom:0}
+table.tight tr.band td{padding:10px 6px 3px;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);border-bottom:1px solid var(--line);background:transparent;cursor:default}
+table.tight tr.band:not(:first-child) td{border-top:1px solid var(--line)}
 table.tight tbody tr{cursor:pointer}
 table.tight td.ttl{white-space:normal;width:100%;line-height:1.25}
 table.tight td.num{text-align:right;font-variant-numeric:tabular-nums;font-weight:600}
@@ -295,10 +297,13 @@ function renderHome(){
   const notIn=[...S.tasks.values()].filter(t=>!isPast(t)&&!S.mine.has(t.id)).length;
   let h=`<div class="hhead"><b>Tulossa</b><span class="muted">${rows.length} aktiivista</span></div>`;
   if(!rows.length) h+=`<div class="empty"><p>Ei aktiivisia tehtäviä korissasi.</p><button class="btn" data-act="go" data-view="kaikki">Selaa tehtäviä</button></div>`;
-  else h+=`<table class="tight"><thead><tr><th>DL</th><th>vrk</th><th>Kurssi</th><th>Aihe</th><th>Tila</th></tr></thead><tbody>${rows.map(r=>{
+  else h+=`<table class="tight"><thead><tr><th>DL</th><th>vrk</th><th>Kurssi</th><th>Aihe</th><th>Tila</th></tr></thead><tbody>${rows.map((r,i)=>{
     const d=daysLeft(r.dl), cls=d===null?"":urg(d);
+    const band = d===null ? "Ei DL:ää" : d<=7 ? "7 vrk tai alle" : d<=14 ? "8–14 vrk" : "Yli 14 vrk";
+    const prev = i ? (x=>x===null?"Ei DL:ää":x<=7?"7 vrk tai alle":x<=14?"8–14 vrk":"Yli 14 vrk")(daysLeft(rows[i-1].dl)) : null;
+    const sep = band!==prev ? `<tr class="band"><td colspan="5">${band}</td></tr>` : "";
     const dd=r.dl?r.dl.split("-"):null;
-    return `<tr class="${cls}" data-act="jump" data-id="${esc(r.t.id)}"><td>${dd?`${+dd[2]}.${+dd[1]}.`:"–"}</td><td class="num">${d===null?"":d}</td>
+    return sep + `<tr class="${cls}" data-act="jump" data-id="${esc(r.t.id)}"><td>${dd?`${+dd[2]}.${+dd[1]}.`:"–"}</td><td class="num">${d===null?"":d}</td>
       <td><span class="code">${esc(r.t.course)}</span></td>
       <td class="ttl">${r.t.type==="Tentti"?`<span class="tentti">Tentti</span> `:""}${esc(r.t.title||"")}</td>
       <td><span class="pill" data-s="${r.st}">${esc(statusLabel(r.st,r.t))}</span></td></tr>`;}).join("")}</tbody></table>`;
