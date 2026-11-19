@@ -96,6 +96,20 @@ details.more summary::-webkit-details-marker{display:none}
 .hidden{display:none!important}
 </style>
 <style>
+.hhead{display:flex;justify-content:space-between;align-items:baseline;margin:2px 2px 8px;font-size:15px}
+table.tight{width:100%;border-collapse:collapse;background:var(--card);border:1px solid var(--line);border-radius:var(--r);overflow:hidden;font-size:13.5px}
+table.tight th{text-align:left;font-size:11.5px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);font-weight:600;padding:7px 6px;border-bottom:1px solid var(--line)}
+table.tight td{padding:7px 6px;border-bottom:1px solid var(--line);vertical-align:middle;white-space:nowrap}
+table.tight tr:last-child td{border-bottom:0}
+table.tight tbody tr{cursor:pointer}
+table.tight td.ttl{white-space:normal;width:100%;line-height:1.25}
+table.tight td.num{text-align:right;font-variant-numeric:tabular-nums;font-weight:600}
+table.tight tr.late td.num,table.tight tr.late td:first-child{color:var(--accent)}
+table.tight tr.soon td.num,table.tight tr.soon td:first-child{color:var(--warn)}
+table.tight .code{font-size:11px;padding:1px 5px}
+table.tight .tentti{color:var(--accent);font-weight:600;font-size:12px}
+.pill{font-size:11.5px;font-weight:600;padding:2px 7px;border-radius:999px;color:#fff;background:var(--s-annettu)}
+.pill[data-s=Aloitettu]{background:var(--s-aloitettu)}.pill[data-s=Valmis]{background:var(--s-valmis)}
 .login{max-width:380px;margin:60px auto;background:var(--card);border:1px solid var(--line);border-radius:16px;padding:22px}
 .login h2{margin:0 0 6px;font-size:19px}
 .login p{color:var(--muted);font-size:14px;margin:0 0 14px}
@@ -114,8 +128,9 @@ table.adm td{padding:8px 4px;border-bottom:1px solid var(--line)}
 <header>
   <div class="top"><h1>Opintotehtävät <span>N26</span></h1><span id="status" class="muted"></span></div>
   <nav id="nav" class="hidden">
-    <button data-view="kori" class="on">Oma kori</button>
-    <button data-view="kaikki">Kaikki tehtävät</button>
+    <button data-view="etusivu" class="on">Etusivu</button>
+    <button data-view="kori">Oma kori</button>
+    <button data-view="kaikki">Kaikki</button>
     <button data-view="admin" class="hidden" id="navAdmin">Ylläpito</button>
   </nav>
 </header>
@@ -135,7 +150,7 @@ function normStatus(s,t){ if(!s) s="Annettu"; if(t && t.type==="Tentti"){ if(s==
 const isFinished = (s,t) => s==="Palautettu" || (t && t.type==="Tentti" && s==="Valmis");
 const BASE = location.origin + location.pathname;
 
-const S = { token:null, me:null, view:"kori", courses:[], tasks:new Map(), mine:new Map(), members:[],
+const S = { token:null, me:null, view:"etusivu", courses:[], tasks:new Map(), mine:new Map(), members:[],
   loaded:false, invalid:false, newLink:null, f:{ koriStatus:"aktiiviset", course:"", q:"", showPast:false } };
 
 const $ = s => document.querySelector(s);
@@ -199,7 +214,7 @@ function render(){
     <p>${S.invalid?"Pyydä ylläpitäjältä uusi linkki.":"Sovellusta käytetään ylläpitäjältä saadulla henkilökohtaisella linkillä. Avaa linkki tällä laitteella, niin sovellus muistaa sinut."}</p></div>
     <div class="foot"><button data-act="privacy">Mitä tietoja tallennetaan</button></div>`; return; }
   if(!S.loaded){ $("#main").innerHTML = `<div class="empty">Ladataan…</div>`; return; }
-  const v = S.view==="kori" ? renderKori() : S.view==="kaikki" ? renderKaikki() : renderAdmin();
+  const v = S.view==="etusivu" ? renderHome() : S.view==="kori" ? renderKori() : S.view==="kaikki" ? renderKaikki() : renderAdmin();
   $("#main").innerHTML = v + `<div class="foot">Kirjautuneena: ${esc(S.me.first_name)}<br>
     <button data-act="profile">Oma nimi</button>·<button data-act="privacy">Mitä tietoja tallennetaan</button>·<button data-act="logout">Unohda tämä laite</button></div>`;
 }
@@ -215,7 +230,7 @@ function card(task, mine, mode){
   const own = mine && mine.my_dl && mine.my_dl!==task.dl ? ` <span class="muted">(oma DL)</span>` : "";
   const by = task.created_by_name ? `<div class="by">Lisännyt: ${esc(task.created_by_name)}</div>` : "";
   const id = esc(task.id);
-  let h = `<div class="card ${cls}">
+  let h = `<div class="card ${cls}" id="c-${id}">
     <div class="row1"><span class="code">${esc(task.course)}</span><span class="type ${task.type==="Tentti"?"tentti":""}">${esc(task.type)}</span>
       <span class="when">${esc(fmtDate(dl))}${own}${whenTxt?` · <b>${whenTxt}</b>`:""}</span></div>
     <div class="title">${esc(task.title || (task.type==="Tentti"?"Tentti":"(nimetön)"))}</div>
@@ -255,6 +270,23 @@ function renderKori(){
   let list=items.filter(x=> S.f.koriStatus==="kaikki"||(S.f.koriStatus==="aktiiviset"?!x.fin:x.m.status===S.f.koriStatus));
   list.sort((a,b)=>byDl(a.dl,b.dl)); if(S.f.koriStatus==="Palautettu") list.reverse();
   h += list.length ? list.map(x=>card(x.t,x.m,"kori")).join("") : `<div class="empty"><p>Ei tehtäviä tässä näkymässä.</p></div>`;
+  return h;
+}
+function renderHome(){
+  const rows=[];
+  for(const [id,m0] of S.mine){ const t=S.tasks.get(id); if(!t) continue; const st=normStatus(m0.status,t); if(isFinished(st,t)) continue; rows.push({t,st,dl:effDl(t,m0)}); }
+  rows.sort((a,b)=>byDl(a.dl,b.dl));
+  const notIn=[...S.tasks.values()].filter(t=>!isPast(t)&&!S.mine.has(t.id)).length;
+  let h=`<div class="hhead"><b>Tulossa</b><span class="muted">${rows.length} aktiivista</span></div>`;
+  if(!rows.length) h+=`<div class="empty"><p>Ei aktiivisia tehtäviä korissasi.</p><button class="btn" data-act="go" data-view="kaikki">Selaa tehtäviä</button></div>`;
+  else h+=`<table class="tight"><thead><tr><th>DL</th><th>vrk</th><th>Kurssi</th><th>Aihe</th><th>Tila</th></tr></thead><tbody>${rows.map(r=>{
+    const d=daysLeft(r.dl), cls=d===null?"":d<0?"late":d<=3?"soon":"";
+    const dd=r.dl?r.dl.split("-"):null;
+    return `<tr class="${cls}" data-act="jump" data-id="${esc(r.t.id)}"><td>${dd?`${+dd[2]}.${+dd[1]}.`:"–"}</td><td class="num">${d===null?"":d}</td>
+      <td><span class="code">${esc(r.t.course)}</span></td>
+      <td class="ttl">${r.t.type==="Tentti"?`<span class="tentti">Tentti</span> `:""}${esc(r.t.title||"")}</td>
+      <td><span class="pill" data-s="${r.st}">${esc(statusLabel(r.st,r.t))}</span></td></tr>`;}).join("")}</tbody></table>`;
+  if(notIn) h+=`<div class="notice" style="margin-top:12px">${notIn} tulevaa tehtävää ei ole korissasi. <button class="btn ghost" data-act="go" data-view="kaikki">Näytä →</button></div>`;
   return h;
 }
 function renderKaikki(){
@@ -371,6 +403,7 @@ document.addEventListener("click", async e=>{
   else if(a==="profile") openProfile();
   else if(a==="privacy") openPrivacy();
   else if(a==="logout"){ if(!confirmTwice("Varmasti? Tarvitset linkin uudelleen")) return; store("amkn26_token",null); S.token=null; S.loaded=false; S.me=null; render(); }
+  else if(a==="jump"){ S.view="kori"; S.f.koriStatus="aktiiviset"; render(); const c=document.getElementById("c-"+id); if(c){ c.scrollIntoView({block:"center"}); c.style.outline="2px solid var(--info)"; setTimeout(()=>c.style.outline="",1500); } }
   else if(a==="koriFilter"){ S.f.koriStatus=b.dataset.k; render(); }
   else if(a==="past"){ S.f.showPast=b.dataset.v==="1"; render(); }
   else if(a==="status"){ const m=S.mine.get(id); if(m && normStatus(m.status,S.tasks.get(id))!==b.dataset.s) upsertMine(id,{status:b.dataset.s}); }
