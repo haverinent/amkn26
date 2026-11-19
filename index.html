@@ -151,12 +151,12 @@ table.adm td{padding:8px 4px;border-bottom:1px solid var(--line)}
 <script src="config.js"></script>
 <script>
 const STATUSES = ["Annettu","Aloitettu","Valmis","Palautettu"];
-const EXAM_STATUSES = ["Annettu","Valmis"];
+const EXAM_STATUSES = ["Annettu","Palautettu"];
 const TYPES = ["Yksilö","Ryhmä","Tentti"];
 const statusesFor = t => t && t.type==="Tentti" ? EXAM_STATUSES : STATUSES;
-const statusLabel = (s,t) => t && t.type==="Tentti" ? ({Annettu:"Tulossa",Valmis:"Tehty"}[s]||s) : s;
-function normStatus(s,t){ if(!s) s="Annettu"; if(t && t.type==="Tentti"){ if(s==="Palautettu") s="Valmis"; else if(s==="Aloitettu") s="Annettu"; } return s; }
-const isFinished = (s,t) => s==="Palautettu" || (t && t.type==="Tentti" && s==="Valmis");
+const statusLabel = (s,t) => t && t.type==="Tentti" ? ({Annettu:"Tulossa",Palautettu:"Tehty"}[s]||s) : s;
+function normStatus(s,t){ if(!s) s="Annettu"; if(t && t.type==="Tentti"){ if(s==="Valmis") s="Palautettu"; else if(s==="Aloitettu") s="Annettu"; } return s; }
+const isFinished = (s,t) => normStatus(s,t)==="Palautettu";
 const BASE = location.origin + location.pathname;
 
 const S = { token:null, me:null, view:"etusivu", courses:[], tasks:new Map(), mine:new Map(), members:[],
