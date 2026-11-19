@@ -48,6 +48,7 @@ textarea{width:100%;resize:vertical;min-height:38px}
 .code{font-weight:700;font-size:12px;letter-spacing:.03em;background:var(--ink);color:var(--bg);padding:2px 7px;border-radius:6px}
 .type{font-size:12px;color:var(--muted);border:1px solid var(--line);padding:1px 7px;border-radius:6px}
 .type.tentti{color:var(--accent);border-color:var(--accent)}
+.type.priv{color:var(--info);border-color:var(--info)}
 .when{margin-left:auto;font-size:13px;color:var(--muted);text-align:right;white-space:nowrap}
 .when b{color:var(--ink)}
 .late .when b{color:var(--accent)} .soon .when b{color:var(--warn)}
@@ -236,10 +237,10 @@ function card(task, mine, mode){
   const whenTxt = d===null ? "" : d<0 ? `${-d} vrk sitten` : d===0 ? "tänään" : d===1 ? "huomenna" : `${d} vrk`;
   const url = safeUrl(task.moodle);
   const own = mine && mine.my_dl && mine.my_dl!==task.dl ? ` <span class="muted">(oma DL)</span>` : "";
-  const by = task.created_by_name ? `<div class="by">Lisännyt: ${esc(task.created_by_name)}</div>` : "";
+  const by = !task.private && task.created_by_name ? `<div class="by">Lisännyt: ${esc(task.created_by_name)}</div>` : "";
   const id = esc(task.id);
   let h = `<div class="card ${cls}" id="c-${id}">
-    <div class="row1"><span class="code">${esc(task.course)}</span><span class="type ${task.type==="Tentti"?"tentti":""}">${esc(task.type)}</span>
+    <div class="row1"><span class="code">${esc(task.course)}</span><span class="type ${task.type==="Tentti"?"tentti":""}">${esc(task.type)}</span>${task.private?`<span class="type priv">🔒 Oma</span>`:""}
       <span class="when">${esc(fmtDate(dl))}${own}${whenTxt?` · <b>${whenTxt}</b>`:""}</span></div>
     <div class="title">${esc(task.title || (task.type==="Tentti"?"Tentti":"(nimetön)"))}</div>
     <div class="cname">${esc(courseName(task.course))}</div>
@@ -342,7 +343,7 @@ function openProfile(){
 function openPrivacy(){
   openSheet(`<h2>Mitä tietoja tallennetaan</h2><div class="txt"><ul>
     <li><b>Etunimi tai nimimerkki</b> – näkyy muille vain tehtävän lisääjänä. Sukunimiä tai sähköpostiosoitteita ei tallenneta.</li>
-    <li><b>Oma kori</b> (statukset, muistiinpanot, oma DL) – vain sinä näet nämä.</li>
+    <li><b>Oma kori</b> (statukset, muistiinpanot, oma DL) ja <b>henkilökohtaiset tehtävät</b> – vain sinä näet nämä.</li>
     <li><b>Yhteiset tehtävät ja kurssit</b> – näkyvät kaikille kurssin jäsenille.</li>
     <li><b>Viimeisin käyttöpäivä</b> – näkyy ylläpitäjälle.</li></ul>
     <p>Pääsy on vain henkilökohtaisella linkillä. Älä jaa omaa linkkiäsi – sillä pääsee omaan koriisi. Tiedot säilytetään EU:ssa (Supabase). Ylläpitäjä poistaa tietosi pyynnöstä.</p></div>
@@ -352,7 +353,7 @@ function openForm(id){
   editing = id ? S.tasks.get(id) : null;
   const t = editing || {course:S.f.course||"",type:"Yksilö",title:"",dl:"",moodle:"",info:""};
   const courses=[...S.courses].sort((a,b)=>a.code.localeCompare(b.code,"fi"));
-  const canDel = editing && (S.me.is_admin || editing.created_by===S.me.id);
+  const canDel = editing && (S.me.is_admin || editing.created_by===S.me.id || editing.private);
   openSheet(`<h2>${editing?"Muokkaa tehtävää":"Lisää tehtävä"}</h2><form class="form" id="taskForm" novalidate>
     <label>Kurssi<select name="course"><option value="">Valitse kurssi…</option>
       ${courses.map(c=>`<option value="${esc(c.code)}" ${c.code===t.course?"selected":""}>${esc(c.code)} – ${esc(c.name)}</option>`).join("")}
@@ -362,8 +363,9 @@ function openForm(id){
       <label>DL / tenttipäivä<input type="date" name="dl" value="${esc(t.dl||"")}"></label></div>
     <label>Aihe<input name="title" value="${esc(t.title)}" placeholder="esim. Oppimispäiväkirja"></label>
     <label>Moodle-linkki<input name="moodle" type="url" value="${esc(t.moodle)}" placeholder="https://moodle.smedu.fi/…"></label>
-    <label>Lisätiedot (näkyy kaikille)<textarea name="info" rows="2">${esc(t.info)}</textarea></label>
-    ${editing?"":`<label class="check"><input type="checkbox" name="toBasket" checked> Lisää myös omaan koriini</label>`}
+    <label>Lisätiedot<textarea name="info" rows="2">${esc(t.info)}</textarea></label>
+    ${!editing || editing.private ? `<label class="check"><input type="checkbox" name="priv" ${editing&&editing.private?"checked":""}> Henkilökohtainen tehtävä – näkyy vain minulle</label>` : ""}
+    ${editing?"":`<label class="check" id="tbWrap"><input type="checkbox" name="toBasket" checked> Lisää myös omaan koriini</label>`}
     <div class="dup" id="dup"></div><div class="err" id="ferr"></div>
     <div class="actions">${canDel?`<button type="button" class="btn danger" data-act="del" style="margin-right:auto">Poista kaikilta</button>`:""}
       <button type="button" class="btn" data-act="close">Peruuta</button><button type="submit" class="btn primary">${editing?"Tallenna":"Lisää"}</button></div></form>`);
@@ -374,6 +376,9 @@ function openForm(id){
     $("#dup").textContent = hit?`Huom: listalla on jo samanlainen tehtävä (${hit.course}: ${hit.title||hit.type}, ${fmtDate(hit.dl)}).`:"";
   });
   f.course.addEventListener("change",()=>$("#newCourse").classList.toggle("hidden",f.course.value!=="__new"));
+  const sync=()=>{ if(f.priv && $("#tbWrap")) $("#tbWrap").classList.toggle("hidden", f.priv.checked); }; if(f.priv){ f.priv.addEventListener("change",sync); sync(); }
+  const resetDup=()=>{ if(f.dataset.dupOk){ delete f.dataset.dupOk; f.querySelector("[type=submit]").textContent=editing?"Tallenna":"Lisää"; } };
+  f.course.addEventListener("change",resetDup); f.dl.addEventListener("change",resetDup);
 }
 async function saveTask(f){
   const err=m=>{$("#ferr").textContent=m;};
@@ -382,11 +387,20 @@ async function saveTask(f){
   const moodle=f.moodle.value.trim(); if(moodle&&!safeUrl(moodle)) return err("Moodle-linkin pitää alkaa https://");
   const title=f.title.value.trim(), type=f.type.value;
   if(!title && type!=="Tentti") return err("Anna tehtävälle aihe.");
-  const btn=f.querySelector("[type=submit]"); btn.disabled=true;
+  const btn=f.querySelector("[type=submit]");
+  const dl=f.dl.value;
+  if(dl && !f.dataset.dupOk){
+    const same=[...S.tasks.values()].filter(x=>x.id!==(editing&&editing.id)&&x.course===course&&x.dl===dl);
+    if(same.length){
+      $("#dup").innerHTML=`<b>Samalle kurssille samalle päivälle on jo tehtävä:</b><br>${same.map(x=>"• "+esc(x.title||x.type)).join("<br>")}<br>Onko tämä uusi tehtävä?`;
+      f.dataset.dupOk="1"; btn.textContent="Kyllä, uusi tehtävä"; return;
+    }
+  }
+  btn.disabled=true;
   try{
     await rpc("app_save_task",{p_id:editing?editing.id:null,p_course:course,p_type:type,p_title:title,p_dl:f.dl.value||null,
-      p_moodle:moodle,p_info:f.info.value.trim(),p_new_course_name:newName,p_to_basket:!editing&&f.toBasket&&f.toBasket.checked});
-    toast(editing?"Tallennettu":"Tehtävä lisätty kaikille"); closeSheet(); loadAll();
+      p_moodle:moodle,p_info:f.info.value.trim(),p_new_course_name:newName,p_to_basket:!editing&&f.toBasket&&f.toBasket.checked,p_private:f.priv?f.priv.checked:false});
+    toast(editing?"Tallennettu":(f.priv&&f.priv.checked?"Henkilökohtainen tehtävä lisätty":"Tehtävä lisätty kaikille")); closeSheet(); loadAll();
   }catch(e){ btn.disabled=false; err(e.message||"Tallennus epäonnistui."); }
 }
 
