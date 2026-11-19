@@ -1,0 +1,450 @@
+<!DOCTYPE html>
+<html lang="fi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Opintotehtävät N26</title>
+<style>
+:root{
+  --bg:#f5f4f0;--card:#fff;--ink:#1d1d1b;--muted:#6b6a65;--line:#e3e1da;
+  --accent:#b3261e;--accent-ink:#fff;--warn:#c76a00;--ok:#2e7d32;--info:#1f5fa8;
+  --s-annettu:#8a8780;--s-aloitettu:#1f5fa8;--s-valmis:#7a5c00;--s-palautettu:#2e7d32;
+  --r:12px;
+}
+@media (prefers-color-scheme:dark){
+  :root{--bg:#161615;--card:#22211f;--ink:#efeee9;--muted:#a3a19a;--line:#36352f;
+  --accent:#e0574e;--warn:#f0a040;--ok:#6cc070;--info:#7fb0ef;
+  --s-annettu:#a3a19a;--s-aloitettu:#7fb0ef;--s-valmis:#e6c25a;--s-palautettu:#6cc070;}
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.4 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
+header{position:sticky;top:0;z-index:5;background:var(--bg);border-bottom:1px solid var(--line)}
+.top{display:flex;align-items:center;justify-content:space-between;padding:12px 14px 6px;max-width:760px;margin:0 auto}
+h1{font-size:18px;margin:0;letter-spacing:-.01em}
+h1 span{color:var(--accent)}
+nav{display:flex;gap:4px;padding:0 10px 8px;max-width:760px;margin:0 auto}
+nav button{flex:1;border:0;background:transparent;color:var(--muted);font:inherit;font-weight:600;padding:8px 6px;border-radius:9px;cursor:pointer}
+nav button.on{background:var(--card);color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,.08)}
+main{max-width:760px;margin:0 auto;padding:12px 12px 90px}
+.bar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;align-items:center}
+select,input,textarea{font:inherit;color:var(--ink);background:var(--card);border:1px solid var(--line);border-radius:9px;padding:8px 10px}
+textarea{width:100%;resize:vertical;min-height:38px}
+.bar input[type=search]{flex:1;min-width:140px}
+.chips{display:flex;gap:6px;overflow-x:auto;padding-bottom:2px;margin-bottom:10px}
+.chip{border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:999px;padding:5px 11px;font:inherit;font-size:13px;white-space:nowrap;cursor:pointer}
+.chip.on{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.chip b{font-weight:600;opacity:.7;margin-left:3px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:12px 12px 10px;margin-bottom:10px;border-left:4px solid var(--line)}
+.card.late{border-left-color:var(--accent)}
+.card.soon{border-left-color:var(--warn)}
+.card.done{opacity:.62}
+.row1{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:4px}
+.code{font-weight:700;font-size:12px;letter-spacing:.03em;background:var(--ink);color:var(--bg);padding:2px 7px;border-radius:6px}
+.type{font-size:12px;color:var(--muted);border:1px solid var(--line);padding:1px 7px;border-radius:6px}
+.type.tentti{color:var(--accent);border-color:var(--accent)}
+.when{margin-left:auto;font-size:13px;color:var(--muted);text-align:right;white-space:nowrap}
+.when b{color:var(--ink)}
+.late .when b{color:var(--accent)} .soon .when b{color:var(--warn)}
+.title{font-weight:600;font-size:15.5px;margin:2px 0}
+.cname{font-size:12.5px;color:var(--muted)}
+.info{font-size:13.5px;color:var(--muted);margin-top:4px;white-space:pre-wrap}
+.links{display:flex;gap:12px;align-items:center;margin-top:8px;flex-wrap:wrap}
+a{color:var(--info)}
+.btn{border:1px solid var(--line);background:var(--card);color:var(--ink);font:inherit;font-weight:600;font-size:13.5px;border-radius:9px;padding:7px 12px;cursor:pointer}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn.ghost{border-color:transparent;background:transparent;color:var(--muted);padding:7px 6px}
+.btn.in{color:var(--ok);border-color:var(--ok)}
+.btn.danger{color:var(--accent);border-color:var(--accent)}
+.btn:disabled{opacity:.5;cursor:default}
+.seg{display:flex;border:1px solid var(--line);border-radius:9px;overflow:hidden;margin-top:9px}
+.seg button{flex:1;border:0;background:transparent;color:var(--muted);font:inherit;font-size:12.5px;font-weight:600;padding:7px 2px;cursor:pointer;border-right:1px solid var(--line)}
+.seg button:last-child{border-right:0}
+.seg button.on[data-s=Annettu]{background:var(--s-annettu);color:#fff}
+.seg button.on[data-s=Aloitettu]{background:var(--s-aloitettu);color:#fff}
+.seg button.on[data-s=Valmis]{background:var(--s-valmis);color:#fff}
+.seg button.on[data-s=Palautettu]{background:var(--s-palautettu);color:#fff}
+details.more{margin-top:8px}
+details.more summary{font-size:13px;color:var(--muted);cursor:pointer;list-style:none}
+details.more summary::-webkit-details-marker{display:none}
+.mine{display:grid;gap:8px;margin-top:8px}
+.mine label{font-size:12.5px;color:var(--muted);display:grid;gap:3px}
+.empty{text-align:center;color:var(--muted);padding:34px 16px}
+.empty p{margin:0 0 14px}
+.notice{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:10px 12px;margin-bottom:10px;font-size:14px}
+.notice.warn{border-color:var(--warn)}
+.notice .btn{margin-top:8px}
+.group{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin:16px 2px 6px}
+.fab{position:fixed;right:16px;bottom:18px;z-index:6;border:0;border-radius:999px;background:var(--accent);color:#fff;font:inherit;font-weight:700;padding:13px 18px;box-shadow:0 4px 14px rgba(0,0,0,.25);cursor:pointer}
+.sheet-bg{position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:10;display:none;align-items:flex-end;justify-content:center}
+.sheet-bg.open{display:flex}
+.sheet{background:var(--bg);width:100%;max-width:560px;max-height:92vh;overflow:auto;border-radius:16px 16px 0 0;padding:16px 16px 24px}
+@media(min-width:600px){.sheet-bg{align-items:center}.sheet{border-radius:16px}}
+.sheet h2{margin:0 0 12px;font-size:17px}
+.form{display:grid;gap:11px}
+.form label{display:grid;gap:4px;font-size:13px;color:var(--muted);font-weight:600}
+.form select,.form input,.form textarea{width:100%}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.actions{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;margin-top:6px}
+.check{display:flex!important;align-items:center;gap:8px;font-weight:500!important;color:var(--ink)!important}
+.check input{width:auto}
+.dup{font-size:13px;color:var(--warn)}
+.err{font-size:13px;color:var(--accent)}
+.toast{position:fixed;left:50%;bottom:80px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:9px 14px;border-radius:9px;font-size:14px;z-index:20;opacity:0;transition:opacity .2s;pointer-events:none}
+.toast.show{opacity:1}
+.muted{color:var(--muted);font-size:13px}
+.hidden{display:none!important}
+</style>
+<style>
+.login{max-width:380px;margin:60px auto;background:var(--card);border:1px solid var(--line);border-radius:16px;padding:22px}
+.login h2{margin:0 0 6px;font-size:19px}
+.login p{color:var(--muted);font-size:14px;margin:0 0 14px}
+.login input{width:100%;margin-bottom:10px}
+.login .btn{width:100%;padding:10px}
+.foot{text-align:center;margin:24px 0 0;font-size:13px;color:var(--muted)}
+.foot button{background:none;border:0;color:var(--info);font:inherit;cursor:pointer;text-decoration:underline;padding:0 4px}
+.by{font-size:12px;color:var(--muted);margin-top:4px}
+table.adm{width:100%;border-collapse:collapse;font-size:14px}
+table.adm td{padding:8px 4px;border-bottom:1px solid var(--line)}
+.sheet .txt{font-size:14.5px;line-height:1.5}
+.sheet .txt li{margin-bottom:6px}
+</style>
+</head>
+<body>
+<header>
+  <div class="top"><h1>Opintotehtävät <span>N26</span></h1><span id="status" class="muted"></span></div>
+  <nav id="nav" class="hidden">
+    <button data-view="kori" class="on">Oma kori</button>
+    <button data-view="kaikki">Kaikki tehtävät</button>
+    <button data-view="admin" class="hidden" id="navAdmin">Ylläpito</button>
+  </nav>
+</header>
+<main id="main"><div class="empty">Ladataan…</div></main>
+<button class="fab hidden" id="fab">+ Lisää tehtävä</button>
+<div class="sheet-bg" id="sheetBg"><div class="sheet" id="sheet"></div></div>
+<div class="toast" id="toast"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="config.js"></script>
+<script>
+const STATUSES = ["Annettu","Aloitettu","Valmis","Palautettu"];
+const EXAM_STATUSES = ["Annettu","Valmis"];
+const TYPES = ["Yksilö","Ryhmä","Tentti"];
+const statusesFor = t => t && t.type==="Tentti" ? EXAM_STATUSES : STATUSES;
+const statusLabel = (s,t) => t && t.type==="Tentti" ? ({Annettu:"Tulossa",Valmis:"Tehty"}[s]||s) : s;
+function normStatus(s,t){ if(!s) s="Annettu"; if(t && t.type==="Tentti"){ if(s==="Palautettu") s="Valmis"; else if(s==="Aloitettu") s="Annettu"; } return s; }
+const isFinished = (s,t) => s==="Palautettu" || (t && t.type==="Tentti" && s==="Valmis");
+
+const sb = supabase.createClient(window.APP_CONFIG.SUPABASE_URL, window.APP_CONFIG.SUPABASE_KEY);
+const S = { session:null, uid:null, admin:false, member:false, view:"kori",
+  courses:[], tasks:new Map(), mine:new Map(), names:{}, allowed:[], myName:"",
+  loaded:false, f:{ koriStatus:"aktiiviset", course:"", q:"", showPast:false } };
+
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const safeUrl = u => /^https?:\/\//i.test(u||"") ? u : "";
+function toast(msg){ const t=$("#toast"); t.textContent=msg; t.classList.add("show"); clearTimeout(t._h); t._h=setTimeout(()=>t.classList.remove("show"),2400); }
+function daysLeft(dl){ if(!dl) return null; const [y,m,d]=dl.split("-").map(Number); const t=new Date(); return Math.round((Date.UTC(y,m-1,d)-Date.UTC(t.getFullYear(),t.getMonth(),t.getDate()))/86400000); }
+function fmtDate(dl){ if(!dl) return "ei DL:ää"; const [y,m,d]=dl.split("-"); const wd=["su","ma","ti","ke","to","pe","la"][new Date(+y,+m-1,+d).getDay()]; return `${wd} ${+d}.${+m}.${y!==String(new Date().getFullYear())?y:""}`; }
+const courseName = code => (S.courses.find(c=>c.code===code)||{}).name || "";
+const effDl = (t,m) => (m && m.my_dl) || t.dl || "";
+const isPast = t => { const d=daysLeft(t.dl); return d!==null && d<0; };
+function fail(e, msg){ console.error(e); toast(msg || "Tallennus epäonnistui"); }
+
+/* ---------- data ---------- */
+async function loadAll(){
+  const [c,t,b,p] = await Promise.all([
+    sb.from("courses").select("code,name"),
+    sb.from("tasks").select("id,course,type,title,dl,moodle,info,created_by"),
+    sb.from("basket").select("task_id,status,note,my_dl").eq("user_id", S.uid),
+    sb.from("profiles").select("id,first_name")
+  ]);
+  if(c.error||t.error||b.error||p.error){ $("#status").textContent="latausvirhe"; console.error(c.error||t.error||b.error||p.error); }
+  S.courses = c.data||[];
+  S.tasks = new Map((t.data||[]).map(x=>[x.id,x]));
+  S.mine = new Map((b.data||[]).map(x=>[x.task_id,x]));
+  S.names = Object.fromEntries((p.data||[]).map(x=>[x.id,x.first_name]));
+  S.myName = S.names[S.uid] || "";
+  S.loaded = true;
+  if(S.admin){ const a=await sb.from("allowed_emails").select("email,is_admin,added_at").order("email"); S.allowed=a.data||[]; }
+  softRender();
+  if(!S.myName) openProfile(true);
+}
+async function upsertMine(task_id, patch){
+  const cur = S.mine.get(task_id) || {task_id,status:"Annettu",note:"",my_dl:null};
+  const row = {...cur, ...patch, user_id:S.uid, task_id};
+  S.mine.set(task_id, row); softRender();
+  const {error} = await sb.from("basket").upsert(row);
+  if(error){ fail(error); await loadAll(); }
+}
+async function removeMine(task_id){
+  S.mine.delete(task_id); render();
+  const {error} = await sb.from("basket").delete().eq("user_id",S.uid).eq("task_id",task_id);
+  if(error){ fail(error,"Poisto epäonnistui"); await loadAll(); } else toast("Poistettu korista");
+}
+
+/* ---------- render ---------- */
+function render(){
+  const logged = !!S.session && S.member;
+  $("#nav").classList.toggle("hidden", !logged);
+  $("#navAdmin").classList.toggle("hidden", !S.admin);
+  $("#fab").classList.toggle("hidden", !logged || S.view==="admin");
+  document.querySelectorAll("nav button").forEach(b=>b.classList.toggle("on", b.dataset.view===S.view));
+  if(!S.session){ $("#main").innerHTML = loginView(); return; }
+  if(!S.member){ $("#main").innerHTML = `<div class="login"><h2>Ei käyttöoikeutta</h2><p>Osoitettasi ei löydy kurssin jäsenlistalta. Pyydä ylläpitäjää lisäämään sinut.</p><button class="btn" data-act="logout">Kirjaudu ulos</button></div>`; return; }
+  if(!S.loaded){ $("#main").innerHTML = `<div class="empty">Ladataan…</div>`; return; }
+  const v = S.view==="kori" ? renderKori() : S.view==="kaikki" ? renderKaikki() : renderAdmin();
+  $("#main").innerHTML = v + `<div class="foot">${S.myName?`Kirjautuneena: ${esc(S.myName)}`:""}<br>
+    <button data-act="profile">Oma nimi</button>·<button data-act="privacy">Mitä tietoja tallennetaan</button>·<button data-act="logout">Kirjaudu ulos</button></div>`;
+}
+function loginView(){
+  return `<div class="login"><h2>Kirjaudu</h2><p>Syötä sähköpostiosoitteesi. Saat sähköpostiin kirjautumislinkin – salasanaa ei tarvita.</p>
+    <form id="loginForm"><input type="email" name="email" required placeholder="nimi@esimerkki.fi" autocomplete="email">
+    <button class="btn primary" type="submit">Lähetä kirjautumislinkki</button></form>
+    <p id="loginMsg" style="margin:12px 0 0"></p></div>
+    <div class="foot"><button data-act="privacy">Mitä tietoja tallennetaan</button></div>`;
+}
+function card(task, mine, mode){
+  const dl = effDl(task, mine), d = daysLeft(dl);
+  const st = mine ? normStatus(mine.status, task) : null;
+  const finished = mine ? isFinished(st, task) : false;
+  let cls = "";
+  if(!finished && d!==null){ if(d<0) cls="late"; else if(d<=3) cls="soon"; }
+  if(finished || (mode==="kaikki" && isPast(task))) cls+=" done";
+  const whenTxt = d===null ? "" : d<0 ? `${-d} vrk sitten` : d===0 ? "tänään" : d===1 ? "huomenna" : `${d} vrk`;
+  const url = safeUrl(task.moodle);
+  const own = mine && mine.my_dl && mine.my_dl!==task.dl ? ` <span class="muted">(oma DL)</span>` : "";
+  const by = task.created_by && S.names[task.created_by] ? `<div class="by">Lisännyt: ${esc(S.names[task.created_by])}</div>` : "";
+  const id = esc(task.id);
+  let h = `<div class="card ${cls}">
+    <div class="row1"><span class="code">${esc(task.course)}</span><span class="type ${task.type==="Tentti"?"tentti":""}">${esc(task.type)}</span>
+      <span class="when">${esc(fmtDate(dl))}${own}${whenTxt?` · <b>${whenTxt}</b>`:""}</span></div>
+    <div class="title">${esc(task.title || (task.type==="Tentti"?"Tentti":"(nimetön)"))}</div>
+    <div class="cname">${esc(courseName(task.course))}</div>
+    ${task.info?`<div class="info">${esc(task.info)}</div>`:""}`;
+  if(mode==="kori"){
+    h += `<div class="seg">${statusesFor(task).map(s=>`<button data-s="${s}" class="${s===st?"on":""}" data-act="status" data-id="${id}">${statusLabel(s,task)}</button>`).join("")}</div>
+      <details class="more"${mine.note?" open":""}><summary>${mine.note?"Omat muistiinpanot":"+ Muistiinpanot ja oma DL"}</summary>
+        <div class="mine">
+          <label>Omat muistiinpanot<textarea data-act="note" data-id="${id}" rows="2" placeholder="Vain sinä näet nämä">${esc(mine.note||"")}</textarea></label>
+          <label>Oma DL / tenttipäivä (jos eri kuin yhteinen)<input type="date" data-act="myDl" data-id="${id}" value="${esc(mine.my_dl||"")}"></label>
+        </div></details>
+      <div class="links">${url?`<a href="${esc(url)}" target="_blank" rel="noopener">Moodle ↗</a>`:""}<span style="flex:1"></span>
+        <button class="btn ghost" data-act="edit" data-id="${id}">Muokkaa</button>
+        <button class="btn ghost" data-act="unbasket" data-id="${id}">Poista korista</button></div>`;
+  } else {
+    h += by + `<div class="links">${url?`<a href="${esc(url)}" target="_blank" rel="noopener">Moodle ↗</a>`:""}<span style="flex:1"></span>
+        <button class="btn ghost" data-act="edit" data-id="${id}">Muokkaa</button>
+        ${mine?`<button class="btn in" data-act="unbasket" data-id="${id}">✓ Korissa</button>`:`<button class="btn primary" data-act="basket" data-id="${id}">+ Koriin</button>`}</div>`;
+  }
+  return h + `</div>`;
+}
+const byDl = (a,b) => { const x=a||"9999", y=b||"9999"; return x<y?-1:x>y?1:0; };
+
+function renderKori(){
+  const items=[], orphans=[];
+  for(const [id,m0] of S.mine){ const t=S.tasks.get(id); if(!t){orphans.push(id);continue;} const m={...m0,status:normStatus(m0.status,t)}; items.push({t,m,dl:effDl(t,m),fin:isFinished(m.status,t)}); }
+  if(!items.length){
+    const up=[...S.tasks.values()].filter(t=>!isPast(t)).length;
+    return `<div class="empty"><p><b>Korisi on tyhjä.</b></p><p>Poimi tehtäviä yhteiseltä listalta, niin voit seurata niiden statusta.</p>
+      ${up?`<button class="btn primary" data-act="basketAll">Lisää kaikki tulevat (${up}) koriin</button><br><br>`:""}
+      <button class="btn" data-act="go" data-view="kaikki">Selaa tehtäviä</button></div>`;
+  }
+  const counts={aktiiviset:0}; STATUSES.forEach(s=>counts[s]=0);
+  items.forEach(x=>{ counts[x.m.status]++; if(!x.fin) counts.aktiiviset++; });
+  const fl=[["aktiiviset","Aktiiviset"],...STATUSES.map(s=>[s,s]),["kaikki","Kaikki"]];
+  let h=`<div class="chips">${fl.map(([k,l])=>`<button class="chip ${S.f.koriStatus===k?"on":""}" data-act="koriFilter" data-k="${k}">${l}${k!=="kaikki"?`<b>${counts[k]||0}</b>`:""}</button>`).join("")}</div>`;
+  let list=items.filter(x=> S.f.koriStatus==="kaikki"||(S.f.koriStatus==="aktiiviset"?!x.fin:x.m.status===S.f.koriStatus));
+  list.sort((a,b)=>byDl(a.dl,b.dl)); if(S.f.koriStatus==="Palautettu") list.reverse();
+  h += list.length ? list.map(x=>card(x.t,x.m,"kori")).join("") : `<div class="empty"><p>Ei tehtäviä tässä näkymässä.</p></div>`;
+  return h;
+}
+function renderKaikki(){
+  const used=[...new Set([...S.tasks.values()].map(t=>t.course))].sort();
+  let h=`<div class="bar"><select data-act="fCourse"><option value="">Kaikki kurssit</option>${used.map(c=>`<option value="${esc(c)}" ${S.f.course===c?"selected":""}>${esc(c)} – ${esc(courseName(c))}</option>`).join("")}</select>
+    <input type="search" data-act="fQ" placeholder="Hae…" value="${esc(S.f.q)}"></div>
+    <div class="chips"><button class="chip ${S.f.showPast?"":"on"}" data-act="past" data-v="0">Tulevat</button><button class="chip ${S.f.showPast?"on":""}" data-act="past" data-v="1">Myös menneet</button></div>`;
+  if(!S.tasks.size) return h+`<div class="empty"><p>Listalla ei ole vielä tehtäviä.</p><button class="btn primary" data-act="new">+ Lisää ensimmäinen</button></div>`;
+  const q=S.f.q.trim().toLowerCase();
+  const list=[...S.tasks.values()].filter(t=>(!S.f.course||t.course===S.f.course)&&(S.f.showPast||!isPast(t))&&(!q||`${t.course} ${t.title} ${t.info} ${courseName(t.course)} ${t.type}`.toLowerCase().includes(q))).sort((a,b)=>byDl(a.dl,b.dl));
+  if(!list.length) return h+`<div class="empty"><p>Ei hakua vastaavia tehtäviä.</p></div>`;
+  const fut=list.filter(t=>!isPast(t)), past=list.filter(isPast).reverse();
+  h += fut.map(t=>card(t,S.mine.get(t.id),"kaikki")).join("");
+  if(past.length) h += `<div class="group">Menneet</div>`+past.map(t=>card(t,S.mine.get(t.id),"kaikki")).join("");
+  return h;
+}
+function renderAdmin(){
+  return `<div class="notice"><b>Kurssin jäsenet</b><br><span class="muted">Vain listalla olevat osoitteet voivat kirjautua. Poistettu osoite menettää pääsyn heti.</span>
+    <form id="addEmail" class="bar" style="margin-top:10px"><input type="email" name="email" required placeholder="uusi@osoite.fi" style="flex:1">
+    <button class="btn primary" type="submit">Lisää</button></form>
+    <details><summary class="muted" style="cursor:pointer">Lisää useita kerralla</summary>
+      <form id="addMany" style="margin-top:8px"><textarea name="list" rows="4" placeholder="Yksi osoite per rivi"></textarea><button class="btn" type="submit" style="margin-top:6px">Lisää kaikki</button></form></details>
+    <table class="adm" style="margin-top:10px">${S.allowed.map(a=>`<tr><td>${esc(a.email)}${a.is_admin?` <span class="type">ylläpitäjä</span>`:""}</td>
+      <td style="text-align:right">${a.is_admin?"":`<button class="btn ghost" data-act="rmEmail" data-email="${esc(a.email)}">Poista</button>`}</td></tr>`).join("")}</table>
+    <p class="muted">${S.allowed.length} jäsentä</p></div>`;
+}
+
+/* ---------- forms ---------- */
+let editing=null;
+function openSheet(html){ $("#sheet").innerHTML=html; $("#sheetBg").classList.add("open"); }
+function closeSheet(){ $("#sheetBg").classList.remove("open"); editing=null; }
+function openProfile(first){
+  openSheet(`<h2>${first?"Tervetuloa!":"Oma nimi"}</h2><form class="form" id="profForm">
+    <p class="muted" style="margin:0">Tallennamme sinusta vain etunimen tai nimimerkin. Se näkyy muille vain tehtävän lisääjänä.</p>
+    <label>Etunimi tai nimimerkki<input name="n" maxlength="30" required value="${esc(S.myName)}"></label>
+    <div class="err" id="perr"></div><div class="actions">${first?"":`<button type="button" class="btn" data-act="close">Peruuta</button>`}<button class="btn primary" type="submit">Tallenna</button></div></form>`);
+}
+function openPrivacy(){
+  openSheet(`<h2>Mitä tietoja tallennetaan</h2><div class="txt"><ul>
+    <li><b>Sähköpostiosoite</b> – kirjautumista varten. Näkyy vain ylläpitäjälle, ei muille käyttäjille.</li>
+    <li><b>Etunimi tai nimimerkki</b> – näkyy muille vain tehtävän lisääjänä. Sukunimeä ei tallenneta.</li>
+    <li><b>Oma kori</b> (statukset, muistiinpanot, oma DL) – vain sinä näet nämä.</li>
+    <li><b>Yhteiset tehtävät ja kurssit</b> – näkyvät kaikille kurssin jäsenille.</li></ul>
+    <p>Tiedot säilytetään EU:ssa (Supabase). Kirjautumattomat eivät näe mitään. Voit pyytää ylläpitäjää poistamaan tietosi milloin tahansa.</p></div>
+    <div class="actions"><button class="btn" data-act="close">Sulje</button></div>`);
+}
+function openForm(id){
+  editing = id ? S.tasks.get(id) : null;
+  const t = editing || {course:S.f.course||"",type:"Yksilö",title:"",dl:"",moodle:"",info:""};
+  const courses=[...S.courses].sort((a,b)=>a.code.localeCompare(b.code,"fi"));
+  const canDel = editing && (S.admin || editing.created_by===S.uid);
+  openSheet(`<h2>${editing?"Muokkaa tehtävää":"Lisää tehtävä"}</h2><form class="form" id="taskForm" novalidate>
+    <label>Kurssi<select name="course"><option value="">Valitse kurssi…</option>
+      ${courses.map(c=>`<option value="${esc(c.code)}" ${c.code===t.course?"selected":""}>${esc(c.code)} – ${esc(c.name)}</option>`).join("")}
+      <option value="__new">+ Uusi kurssi…</option></select></label>
+    <div class="two hidden" id="newCourse"><label>Lyhenne<input name="ncode" maxlength="12"></label><label>Kurssin nimi<input name="nname"></label></div>
+    <div class="two"><label>Tyyppi<select name="type">${TYPES.map(x=>`<option ${x===t.type?"selected":""}>${x}</option>`).join("")}</select></label>
+      <label>DL / tenttipäivä<input type="date" name="dl" value="${esc(t.dl||"")}"></label></div>
+    <label>Aihe<input name="title" value="${esc(t.title)}" placeholder="esim. Oppimispäiväkirja"></label>
+    <label>Moodle-linkki<input name="moodle" type="url" value="${esc(t.moodle)}" placeholder="https://moodle.smedu.fi/…"></label>
+    <label>Lisätiedot (näkyy kaikille)<textarea name="info" rows="2">${esc(t.info)}</textarea></label>
+    ${editing?"":`<label class="check"><input type="checkbox" name="toBasket" checked> Lisää myös omaan koriini</label>`}
+    <div class="dup" id="dup"></div><div class="err" id="ferr"></div>
+    <div class="actions">${canDel?`<button type="button" class="btn danger" data-act="del" style="margin-right:auto">Poista kaikilta</button>`:""}
+      <button type="button" class="btn" data-act="close">Peruuta</button><button type="submit" class="btn primary">${editing?"Tallenna":"Lisää"}</button></div></form>`);
+  const f=$("#taskForm");
+  f.addEventListener("input",()=>{
+    const c=f.course.value, ti=f.title.value.trim().toLowerCase(), ty=f.type.value, dl=f.dl.value;
+    const hit=[...S.tasks.values()].find(x=>x.id!==(editing&&editing.id)&&x.course===c&&((ti&&(x.title||"").trim().toLowerCase()===ti)||(ty==="Tentti"&&x.type==="Tentti"&&dl&&x.dl===dl)));
+    $("#dup").textContent = hit?`Huom: listalla on jo samanlainen tehtävä (${hit.course}: ${hit.title||hit.type}, ${fmtDate(hit.dl)}).`:"";
+  });
+  f.course.addEventListener("change",()=>$("#newCourse").classList.toggle("hidden",f.course.value!=="__new"));
+}
+async function saveTask(f){
+  const err=m=>{$("#ferr").textContent=m;};
+  let course=f.course.value; if(!course) return err("Valitse kurssi.");
+  if(course==="__new"){
+    const code=f.ncode.value.trim().toUpperCase(), name=f.nname.value.trim();
+    if(!code||!name) return err("Anna uuden kurssin lyhenne ja nimi.");
+    if(!S.courses.find(c=>c.code===code)){ const {error}=await sb.from("courses").insert({code,name}); if(error) return err("Kurssin lisäys epäonnistui."); S.courses.push({code,name}); }
+    course=code;
+  }
+  const moodle=f.moodle.value.trim(); if(moodle&&!safeUrl(moodle)) return err("Moodle-linkin pitää alkaa https://");
+  const data={course,type:f.type.value,title:f.title.value.trim(),dl:f.dl.value||null,moodle,info:f.info.value.trim()};
+  if(!data.title && data.type!=="Tentti") return err("Anna tehtävälle aihe.");
+  f.querySelector("[type=submit]").disabled=true;
+  if(editing){
+    const {error}=await sb.from("tasks").update(data).eq("id",editing.id);
+    if(error){ f.querySelector("[type=submit]").disabled=false; return err("Tallennus epäonnistui."); }
+    toast("Tallennettu");
+  } else {
+    const {data:row,error}=await sb.from("tasks").insert({...data,created_by:S.uid,updated_by:S.uid}).select().single();
+    if(error){ f.querySelector("[type=submit]").disabled=false; return err("Tallennus epäonnistui."); }
+    if(f.toBasket&&f.toBasket.checked) await sb.from("basket").upsert({user_id:S.uid,task_id:row.id,status:"Annettu"});
+    toast("Tehtävä lisätty kaikille");
+  }
+  closeSheet(); await loadAll();
+}
+
+/* ---------- events ---------- */
+document.addEventListener("submit", async e=>{
+  e.preventDefault(); const f=e.target;
+  if(f.id==="loginForm"){
+    const email=f.email.value.trim().toLowerCase(); const b=f.querySelector("button"); b.disabled=true;
+    const {error}=await sb.auth.signInWithOtp({email,options:{emailRedirectTo:location.origin+location.pathname}});
+    $("#loginMsg").textContent = error ? (/allowed|sallittujen|Database error/i.test(error.message) ? "Osoitetta ei löydy kurssin jäsenlistalta." : "Linkin lähetys epäonnistui. Yritä hetken päästä uudelleen.") : "Linkki lähetetty! Avaa sähköposti ja paina linkkiä tällä laitteella.";
+    b.disabled=false;
+  } else if(f.id==="taskForm") saveTask(f);
+  else if(f.id==="profForm"){
+    const n=f.n.value.trim(); if(!n) return;
+    const {error}=await sb.from("profiles").upsert({id:S.uid,first_name:n});
+    if(error) return $("#perr").textContent="Tallennus epäonnistui.";
+    S.myName=n; S.names[S.uid]=n; closeSheet(); render();
+  } else if(f.id==="addEmail"||f.id==="addMany"){
+    const raw = f.id==="addEmail" ? [f.email.value] : f.list.value.split(/[\s,;]+/);
+    const rows=[...new Set(raw.map(x=>x.trim().toLowerCase()).filter(x=>/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(x)))].map(email=>({email}));
+    if(!rows.length) return toast("Ei kelvollisia osoitteita");
+    const {error}=await sb.from("allowed_emails").upsert(rows,{onConflict:"email",ignoreDuplicates:true});
+    if(error) return fail(error); toast(`${rows.length} osoitetta lisätty`); await loadAll();
+  }
+});
+document.addEventListener("click", async e=>{
+  const nb=e.target.closest("nav button"); if(nb){ S.view=nb.dataset.view; render(); scrollTo(0,0); return; }
+  if(e.target.id==="fab") return openForm();
+  if(e.target.id==="sheetBg" && S.myName) return closeSheet();
+  const b=e.target.closest("[data-act]"); if(!b||["TEXTAREA","INPUT","SELECT"].includes(b.tagName)) return;
+  const id=b.dataset.id, act=b.dataset.act;
+  if(act==="go"){ S.view=b.dataset.view; render(); }
+  else if(act==="new") openForm();
+  else if(act==="close") closeSheet();
+  else if(act==="edit") openForm(id);
+  else if(act==="profile") openProfile(false);
+  else if(act==="privacy") openPrivacy();
+  else if(act==="logout"){ await sb.auth.signOut(); }
+  else if(act==="koriFilter"){ S.f.koriStatus=b.dataset.k; render(); }
+  else if(act==="past"){ S.f.showPast=b.dataset.v==="1"; render(); }
+  else if(act==="status"){ const m=S.mine.get(id); if(m && normStatus(m.status,S.tasks.get(id))!==b.dataset.s) upsertMine(id,{status:b.dataset.s}); }
+  else if(act==="basket"){ await upsertMine(id,{status:"Annettu"}); toast("Lisätty koriin"); }
+  else if(act==="unbasket"){
+    if(b.dataset.confirm!=="1"){ b.dataset.confirm="1"; b.textContent="Varmasti?"; setTimeout(()=>{ if(b.isConnected) render(); },3000); return; }
+    removeMine(id);
+  }
+  else if(act==="basketAll"){
+    b.disabled=true; const rows=[...S.tasks.values()].filter(t=>!isPast(t)&&!S.mine.has(t.id)).map(t=>({user_id:S.uid,task_id:t.id,status:"Annettu"}));
+    const {error}=await sb.from("basket").upsert(rows); if(error) fail(error); else toast(`${rows.length} tehtävää lisätty koriin`); await loadAll();
+  }
+  else if(act==="del"){
+    if(b.dataset.confirm!=="1"){ b.dataset.confirm="1"; b.textContent="Poistetaanko kaikilta?"; return; }
+    const {error}=await sb.from("tasks").delete().eq("id",editing.id); if(error) return fail(error,"Poisto epäonnistui");
+    closeSheet(); toast("Tehtävä poistettu"); await loadAll();
+  }
+  else if(act==="rmEmail"){
+    if(b.dataset.confirm!=="1"){ b.dataset.confirm="1"; b.textContent="Varmasti?"; return; }
+    const {error}=await sb.from("allowed_emails").delete().eq("email",b.dataset.email); if(error) return fail(error,"Poisto epäonnistui");
+    toast("Osoite poistettu"); await loadAll();
+  }
+});
+document.addEventListener("change", e=>{
+  const el=e.target, act=el.dataset&&el.dataset.act; if(!act) return;
+  const m=S.mine.get(el.dataset.id);
+  if(act==="note" && m && (m.note||"")!==el.value) upsertMine(el.dataset.id,{note:el.value});
+  else if(act==="myDl" && m && (m.my_dl||"")!==el.value) upsertMine(el.dataset.id,{my_dl:el.value||null});
+  else if(act==="fCourse"){ S.f.course=el.value; render(); }
+});
+let qT; document.addEventListener("input", e=>{
+  if(e.target.dataset && e.target.dataset.act==="fQ"){ const el=e.target; clearTimeout(qT); qT=setTimeout(()=>{ S.f.q=el.value; const p=el.selectionStart; render(); const n=$('[data-act=fQ]'); if(n){n.focus(); n.setSelectionRange(p,p);} },250); }
+});
+let pending=false;
+function softRender(){ const a=document.activeElement; if(a&&(a.tagName==="TEXTAREA"||(a.tagName==="INPUT"&&a.type!=="search"))&&$("#main").contains(a)){ pending=true; return; } render(); }
+document.addEventListener("focusout",()=>{ if(pending){ pending=false; setTimeout(render,50); } });
+document.addEventListener("visibilitychange",()=>{ if(!document.hidden && S.member) loadAll(); });
+
+/* ---------- auth ---------- */
+let channel=null;
+async function onSession(session){
+  S.session=session; S.uid=session?session.user.id:null; S.loaded=false; S.member=false; S.admin=false;
+  if(channel){ sb.removeChannel(channel); channel=null; }
+  render();
+  if(!session) return;
+  const [m,a]=await Promise.all([sb.rpc("is_member"),sb.rpc("is_admin")]);
+  S.member=!!m.data; S.admin=!!a.data; render();
+  if(!S.member) return;
+  await loadAll();
+  let rt; channel=sb.channel("live").on("postgres_changes",{event:"*",schema:"public",table:"tasks"},()=>{ clearTimeout(rt); rt=setTimeout(loadAll,400); })
+    .on("postgres_changes",{event:"*",schema:"public",table:"courses"},()=>{ clearTimeout(rt); rt=setTimeout(loadAll,400); }).subscribe();
+}
+let lastUid;
+sb.auth.onAuthStateChange((ev,session)=>{ const uid=session?session.user.id:null; if(uid!==lastUid || ev==="SIGNED_OUT"){ lastUid=uid; setTimeout(()=>onSession(session),0); } else S.session=session; });
+</script>
+</body>
+</html>
