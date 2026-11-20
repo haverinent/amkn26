@@ -178,16 +178,12 @@ const audKey = t => (t.audience||[]).slice().sort((a,b)=>a==="P"?-1:1).join(",")
 const audBadge = t => { const k=audKey(t); return k ? `<span class="type aud">${k.replace(",","+")}</span>` : ""; };
 const visibleMine = id => { const m=S.mine.get(id); return m && !m.hidden ? m : null; };
 const isPast = t => { const d=daysLeft(t.dl); return d!==null && d<0; };
-const linkFor = tok => BASE + "#k=" + tok;
 
 /* ---------- token ---------- */
 function store(k,v){ try{ v===null?localStorage.removeItem(k):localStorage.setItem(k,v); }catch(_){} }
 function readStore(k){ try{ return localStorage.getItem(k); }catch(_){ return null; } }
-(function grabToken(){
-  const m = location.hash.match(/k=([a-f0-9]{32,})/i);
-  if(m){ S.token=m[1]; store("amkn26_token",S.token); history.replaceState(null,"",BASE); }
-  else S.token = readStore("amkn26_token");
-})();
+S.token = readStore("amkn26_token");
+if(location.hash) history.replaceState(null,"",BASE);
 
 /* ---------- api ---------- */
 async function rpc(fn, args={}){
@@ -230,8 +226,7 @@ function render(){
     <p>${S.invalid?"Kirjautumisesi on vanhentunut. Kirjaudu uudelleen.":"Kirjaudu ylläpitäjältä saamallasi käyttäjätunnuksella ja salasanalla. Sovellus muistaa sinut tällä laitteella."}</p>
     <form id="loginForm"><input name="u" required autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="Käyttäjätunnus (etunimi)">
     <input name="pw" type="password" required autocomplete="current-password" placeholder="Salasana">
-    <button class="btn primary" type="submit">Kirjaudu</button></form><p id="loginMsg" class="err" style="margin:10px 0 0"></p>
-    <p class="muted" style="margin:12px 0 0">Jos sait henkilökohtaisen linkin, voit myös vain avata sen.</p></div>
+    <button class="btn primary" type="submit">Kirjaudu</button></form><p id="loginMsg" class="err" style="margin:10px 0 0"></p></div>
     <div class="foot"><button data-act="privacy">Mitä tietoja tallennetaan</button></div>`; return; }
   if(!S.loaded){ $("#main").innerHTML = `<div class="empty">Ladataan…</div>`; return; }
   const v = S.view==="etusivu" ? renderHome() : S.view==="kori" ? renderKori() : S.view==="kaikki" ? renderKaikki() : renderAdmin();
@@ -336,9 +331,8 @@ function linkBox(c){
   const lines=[`AmkN26 OPO: ${BASE}`];
   if(c.username) lines.push(`Käyttäjätunnus: ${c.username}`);
   if(c.password) lines.push(`Salasana: ${c.password}`);
-  if(c.tok) lines.push(`Tai suora kirjautumislinkki: ${linkFor(c.tok)}`);
   const txt=lines.join("\n");
-  return `<div class="notice warn"><b>${esc(c.name)}: ${c.password&&c.tok?"tunnukset ja linkki":c.password?"uusi salasana":"uusi linkki"}</b><br>
+  return `<div class="notice warn"><b>${esc(c.name)}: ${c.isNew?"tunnukset":"uusi salasana"}</b><br>
     <span class="muted">Kopioi ja lähetä nyt suoraan henkilölle – tietoja ei näytetä uudelleen.</span>
     <textarea readonly rows="${lines.length+2}" style="margin-top:8px;font-size:13px" onclick="this.select()">${esc(txt)}</textarea>
     <button class="btn primary" data-act="copy" data-link="${esc(txt)}">Kopioi</button> <button class="btn ghost" data-act="hideLink">Valmis</button></div>`;
@@ -346,14 +340,13 @@ function linkBox(c){
 function renderAdmin(){
   const ago = t => !t ? "ei vielä käyttänyt" : "käytti viimeksi " + new Date(t).toLocaleDateString("fi-FI");
   return (S.newLink?linkBox(S.newLink):"") + `<div class="notice"><b>Kurssin jäsenet</b><br>
-    <span class="muted">Uusi jäsen saa käyttäjätunnuksen, salasanan ja suoran kirjautumislinkin. Jos tunnus tai linkki joutuu vääriin käsiin, luo uusi – vanha lakkaa toimimasta heti.</span>
+    <span class="muted">Uusi jäsen saa käyttäjätunnuksen ja salasanan. Jos salasana unohtuu tai joutuu vääriin käsiin, luo uusi – vanha lakkaa toimimasta heti.</span>
     <form id="addMember" class="bar" style="margin-top:10px"><input name="n" required maxlength="30" placeholder="Etunimi" style="flex:1">
     <input name="u" required maxlength="30" placeholder="Tunnus" autocapitalize="none" style="flex:1">
     <button class="btn primary" type="submit">Luo tunnus</button></form>
     <table class="adm">${S.members.map(m=>`<tr><td>${esc(m.first_name)}${m.is_admin?` <span class="type">ylläpitäjä</span>`:""}<br>
       <span class="muted">tunnus: <b>${esc(m.username||"–")}</b>${m.has_password?"":" · ei salasanaa"} · ${ago(m.last_seen)}</span></td>
       <td style="text-align:right"><button class="btn ghost" data-act="resetPw" data-mid="${esc(m.id)}" data-name="${esc(m.first_name)}" data-user="${esc(m.username||"")}">Uusi salasana</button>
-      <button class="btn ghost" data-act="reset" data-mid="${esc(m.id)}" data-name="${esc(m.first_name)}">Uusi linkki</button>
       <button class="btn ghost" data-act="editUser" data-mid="${esc(m.id)}" data-user="${esc(m.username||"")}">Tunnus</button>
       ${m.id===S.me.id?"":`<button class="btn ghost" data-act="rmMember" data-mid="${esc(m.id)}">Poista</button>`}</td></tr>`).join("")}</table>
     <p class="muted">${S.members.length} jäsentä</p></div>`;
@@ -388,7 +381,7 @@ function openPrivacy(){
     <li><b>Oma kori</b> (statukset, muistiinpanot, oma DL) ja <b>henkilökohtaiset tehtävät</b> – vain sinä näet nämä.</li>
     <li><b>Yhteiset tehtävät ja kurssit</b> – näkyvät kaikille kurssin jäsenille.</li>
     <li><b>Viimeisin käyttöpäivä</b> – näkyy ylläpitäjälle.</li></ul>
-    <p>Pääsy vain omalla tunnuksella tai henkilökohtaisella linkillä. Älä jaa salasanaasi tai linkkiäsi – niillä pääsee omaan koriisi. Tiedot säilytetään EU:ssa (Supabase). Ylläpitäjä poistaa tietosi pyynnöstä.</p></div>
+    <p>Pääsy vain omalla käyttäjätunnuksella ja salasanalla. Älä jaa salasanaasi – sillä pääsee omaan koriisi. Tiedot säilytetään EU:ssa (Supabase). Ylläpitäjä poistaa tietosi pyynnöstä.</p></div>
     <div class="actions"><button class="btn" data-act="close">Sulje</button></div>`);
 }
 function openForm(id){
@@ -453,7 +446,7 @@ document.addEventListener("submit", async e=>{
   if(f.id==="taskForm") saveTask(f);
   else if(f.id==="profForm"){ const n=f.n.value.trim(); if(!n) return; await act("app_rename",{p_name:n},"Tallennettu"); closeSheet(); loadAll(); }
   else if(f.id==="addMember"){ const n=f.n.value.trim(), u=f.u.value.trim().toLowerCase(); if(!n||!u) return;
-    const r=await act("app_create_member",{p_name:n,p_username:u}); S.newLink={name:n,username:r.username,password:r.password,tok:r.token}; loadAll(); }
+    const r=await act("app_create_member",{p_name:n,p_username:u}); S.newLink={name:n,username:r.username,password:r.password,isNew:true}; loadAll(); }
   else if(f.id==="loginForm"){
     const b=f.querySelector("button"); b.disabled=true; $("#loginMsg").textContent="";
     try{ const r=await rpc("app_login",{p_username:f.u.value.trim(),p_password:f.pw.value});
@@ -498,10 +491,8 @@ document.addEventListener("click", async e=>{
   else if(a==="unbasket"){ if(!confirmTwice("Varmasti?")) return; S.mine.delete(id); render(); try{ await act("app_remove_basket",{p_task:id},"Poistettu korista"); }catch(_){ loadAll(); } }
   else if(a==="basketAll"){ b.disabled=true; const ids=[...S.tasks.values()].filter(t=>!isPast(t)).map(t=>t.id); await act("app_add_basket_many",{p_tasks:ids},`${ids.length} tehtävää lisätty koriin`); loadAll(); }
   else if(a==="del"){ if(!confirmTwice("Poistetaanko kaikilta?")) return; await act("app_delete_task",{p_id:editing.id},"Tehtävä poistettu"); closeSheet(); loadAll(); }
-  else if(a==="reset"){ if(!confirmTwice("Vanha linkki lakkaa toimimasta – OK?")) return; const tok=await act("app_reset_link",{p_member:b.dataset.mid});
-    if(b.dataset.mid===S.me.id){ S.token=tok; store("amkn26_token",tok); } S.newLink={name:b.dataset.name,tok}; render(); }
   else if(a==="rmMember"){ if(!confirmTwice("Poistetaanko jäsen ja hänen korinsa?")) return; await act("app_remove_member",{p_member:b.dataset.mid},"Jäsen poistettu"); loadAll(); }
-  else if(a==="copy"){ try{ await navigator.clipboard.writeText(b.dataset.link); toast("Linkki kopioitu"); }catch(_){ toast("Kopioi linkki kentästä"); } }
+  else if(a==="copy"){ try{ await navigator.clipboard.writeText(b.dataset.link); toast("Kopioitu"); }catch(_){ toast("Kopioi teksti kentästä"); } }
   else if(a==="hideLink"){ S.newLink=null; render(); }
 });
 document.addEventListener("change", e=>{
@@ -521,7 +512,6 @@ function softRender(){ const a=document.activeElement; if(a&&(a.tagName==="TEXTA
 document.addEventListener("focusout",()=>{ if(pending){ pending=false; setTimeout(render,50); } });
 document.addEventListener("visibilitychange",()=>{ if(!document.hidden && S.token) loadAll(); });
 setInterval(()=>{ if(!document.hidden && S.token) loadAll(); }, 60000);
-window.addEventListener("hashchange",()=>{ const m=location.hash.match(/k=([a-f0-9]{32,})/i); if(m){ S.token=m[1]; store("amkn26_token",S.token); history.replaceState(null,"",BASE); S.loaded=false; loadAll(); } });
 loadAll();
 </script>
 </body>
