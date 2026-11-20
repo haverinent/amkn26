@@ -394,7 +394,7 @@ function openForm(id){
   const t = editing || {course:S.f.course||"",type:"Yksilö",title:"",dl:"",moodle:"",info:""};
   const courses=[...S.courses].sort((a,b)=>a.code.localeCompare(b.code,"fi"));
   const canDel = editing && (S.me.is_admin || editing.created_by===S.me.id || editing.private);
-  openSheet(`<h2>${editing?"Muokkaa tehtävää":"Lisää tehtävä"}</h2><form class="form" id="taskForm" novalidate>
+  openSheet(`<h2>${editing?"Muokkaa tehtävää":"Lisää tehtävä"}</h2>${editing&&!editing.private?`<div class="notice warn" style="font-size:13.5px">Tämä on yhteinen tehtävä: muutokset näkyvät kaikille kurssilaisille. Omat merkintäsi (tila, muistiinpanot, oma DL) teet Oma kori -näkymässä.</div>`:""}<form class="form" id="taskForm" novalidate>
     <label>Kurssi<select name="course"><option value="">Valitse kurssi…</option>
       ${courses.map(c=>`<option value="${esc(c.code)}" ${c.code===t.course?"selected":""}>${esc(c.code)} – ${esc(c.name)}</option>`).join("")}
       <option value="__new">+ Uusi kurssi…</option></select></label>
