@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex">
-<title>Opintotehtävät N26</title>
+<title>AmkN26 OPO</title>
 <style>
 :root{
   --bg:#f5f4f0;--card:#fff;--ink:#1d1d1b;--muted:#6b6a65;--line:#e3e1da;
@@ -137,7 +137,7 @@ table.adm td{padding:8px 4px;border-bottom:1px solid var(--line)}
 </head>
 <body>
 <header>
-  <div class="top"><h1>Opintotehtävät <span>N26</span></h1><span id="status" class="muted"></span></div>
+  <div class="top"><h1>AmkN26 <span>OPO</span></h1><span id="status" class="muted"></span></div>
   <nav id="nav" class="hidden">
     <button data-view="etusivu" class="on">Etusivu</button>
     <button data-view="kori">Oma kori</button>
@@ -333,7 +333,7 @@ function renderKaikki(){
   return h;
 }
 function linkBox(c){
-  const lines=[`Opintotehtävät N26: ${BASE}`];
+  const lines=[`AmkN26 OPO: ${BASE}`];
   if(c.username) lines.push(`Käyttäjätunnus: ${c.username}`);
   if(c.password) lines.push(`Salasana: ${c.password}`);
   if(c.tok) lines.push(`Tai suora kirjautumislinkki: ${linkFor(c.tok)}`);

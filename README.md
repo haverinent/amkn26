@@ -1,4 +1,4 @@
-# Opintotehtävät N26
+# AmkN26 OPO
 
 Kurssin yhteinen oppimistehtävien ja tenttien seuranta. Tehtävät ovat yhteisiä, ja jokaisella on oma kori, jossa hän seuraa omaa statustaan.
 
