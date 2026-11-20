@@ -79,7 +79,7 @@ a{color:var(--info)}
 details.more{margin-top:8px}
 details.more summary{font-size:13px;color:var(--muted);cursor:pointer;list-style:none}
 details.more summary::-webkit-details-marker{display:none}
-.mine{display:grid;gap:8px;margin-top:8px}
+.mine{display:grid;gap:8px;margin-top:10px}
 .mine label{font-size:12.5px;color:var(--muted);display:grid;gap:3px}
 .empty{text-align:center;color:var(--muted);padding:34px 16px}
 .empty p{margin:0 0 14px}
@@ -182,6 +182,8 @@ const AUD = [["","Kaikki"],["P","Pelastajat (P)"],["AP","Alipäällystö (AP)"],
 const audKey = t => (t.audience||[]).slice().sort((a,b)=>a==="P"?-1:1).join(",");
 const audBadge = t => { const k=audKey(t); return k ? `<span class="type aud">${k.replace(",","+")}</span>` : ""; };
 const visibleMine = id => { const m=S.mine.get(id); return m && !m.hidden ? m : null; };
+const notesState = new Map();
+const notesOpen = (id,m) => notesState.has(id) ? notesState.get(id) : !!(m && (m.note || m.my_dl));
 const isPast = t => { const d=daysLeft(t.dl); return d!==null && d<0; };
 
 /* ---------- token ---------- */
@@ -258,18 +260,18 @@ function card(task, mine, mode){
     ${task.info?`<div class="info">${esc(task.info)}</div>`:""}`;
   if(mode==="kori"){
     h += `<div class="seg">${statusesFor(task).map(s=>`<button data-s="${s}" class="${s===st?"on":""}" data-act="status" data-id="${id}">${statusLabel(s,task)}</button>`).join("")}</div>
-      <details class="more"${mine.note?" open":""}><summary>${mine.note?"Omat muistiinpanot":"+ Muistiinpanot ja oma DL"}</summary>
-        <div class="mine">
+      ${notesOpen(id,mine)?`<div class="mine">
           <label>Omat muistiinpanot<textarea data-act="note" data-id="${id}" rows="2" placeholder="Vain sinä näet nämä">${esc(mine.note||"")}</textarea></label>
           <label>Oma DL / tenttipäivä (jos eri kuin yhteinen)<input type="date" data-act="myDl" data-id="${id}" value="${esc(mine.my_dl||"")}"></label>
-        </div></details>
+        </div>`:""}
       <div class="links">${url?`<a href="${esc(url)}" target="_blank" rel="noopener">Moodle ↗</a>`:""}<span style="flex:1"></span>
-        <button class="btn ghost" data-act="edit" data-id="${id}">Muokkaa</button>
+        <button class="btn ghost" data-act="notes" data-id="${id}">${notesOpen(id,mine)?"Sulje muistiinpanot":"Muistiinpanot ja oma DL"}</button>
+        <button class="btn ghost" data-act="edit" data-id="${id}">Muokkaa tehtävää</button>
         <button class="btn ghost" data-act="unbasket" data-id="${id}">Poista korista</button>
         <button class="btn ghost" data-act="hide" data-id="${id}">Piilota</button></div>`;
   } else {
     h += by + `<div class="links">${url?`<a href="${esc(url)}" target="_blank" rel="noopener">Moodle ↗</a>`:""}<span style="flex:1"></span>
-        <button class="btn ghost" data-act="edit" data-id="${id}">Muokkaa</button>
+        <button class="btn ghost" data-act="edit" data-id="${id}">Muokkaa tehtävää</button>
         ${mine && mine.hidden ? `<button class="btn" data-act="unhide" data-id="${id}">Palauta</button>`
           : `<button class="btn ghost" data-act="hide" data-id="${id}">Piilota minulta</button>${mine?`<button class="btn in" data-act="unbasket" data-id="${id}">✓ Korissa</button>`:`<button class="btn primary" data-act="basket" data-id="${id}">+ Koriin</button>`}`}</div>`;
   }
@@ -487,6 +489,7 @@ document.addEventListener("click", async e=>{
   else if(a==="jump"){ S.view="kori"; S.f.koriStatus="aktiiviset"; render(); const c=document.getElementById("c-"+id); if(c){ c.scrollIntoView({block:"center"}); c.style.outline="2px solid var(--info)"; setTimeout(()=>c.style.outline="",1500); } }
   else if(a==="hide"){ const m=S.mine.get(id)||{task_id:id,status:"Annettu",note:"",my_dl:null}; S.mine.set(id,{...m,hidden:true}); render(); try{ await act("app_set_hidden",{p_task:id,p_hidden:true},"Piilotettu – löydät sen Piilotetut-suodattimesta"); }catch(_){ loadAll(); } }
   else if(a==="unhide"){ try{ await act("app_set_hidden",{p_task:id,p_hidden:false},"Palautettu"); }finally{ loadAll(); } }
+  else if(a==="notes"){ notesState.set(id, !notesOpen(id,S.mine.get(id))); render(); if(notesOpen(id,S.mine.get(id))){ const t=document.querySelector(`textarea[data-id="${id}"]`); if(t) t.focus(); } }
   else if(a==="listF"){ S.f.list=b.dataset.k; render(); }
   else if(a==="goNew"){ S.view="kaikki"; S.f.list="uudet"; render(); scrollTo(0,0); }
   else if(a==="koriFilter"){ S.f.koriStatus=b.dataset.k; render(); }
